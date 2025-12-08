@@ -40,6 +40,9 @@ plt.rcParams.update({
     "figure.dpi": 300,
     "mathtext.fontset": "cm",
 })
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
+
 
 # Default base colours (one per distinct b)
 base_colors = ["#DDA448", "#476C9B", "#87C38F", "#DA2C38", "#43291F", "#FFD3BA"]
@@ -1463,6 +1466,6 @@ def create_all():
     figure_8()
     figure_9()
 
-# if __name__ == "__main__":
-#     create_all()
-#     print("All figures created successfully.")
+if __name__ == "__main__":
+    create_all()
+    print("All figures created successfully.")
