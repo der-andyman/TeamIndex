@@ -28,12 +28,12 @@ from typing import (
 
 data_folder = Path("./data")
 
-plot_folder = Path("./figures")
+plot_folder = Path("./figures/")
 
 plt.rcParams.update({
     "font.family": "serif",
     "font.size": 8,
-    "axes.labelsize": 8,
+    "axes.labelsize": 7,
     "legend.fontsize": 6,
     "legend.title_fontsize": 6,
     "lines.linewidth": 1.0,
@@ -42,6 +42,19 @@ plt.rcParams.update({
 })
 plt.rcParams["pdf.fonttype"] = 42
 plt.rcParams["ps.fonttype"] = 42
+
+# sns.set_theme(
+#     # context = "notebook",
+#     rc = {
+#         "font.size": 7,
+#         "axes.titlesize": 7,
+#         "axes.labelsize": 7,
+#         "xtick.labelsize": 7,
+#         "ytick.labelsize": 7,
+#         "legend.fontsize": 7
+#     }
+# )
+
 
 
 # Default base colours (one per distinct b)
@@ -164,7 +177,7 @@ def _add_split_legends(
 
 def plot_2d_distribution(data, n_quantiles=10, highlight_rectangle=None,
                          highlight_points=None, with_marginals=False, colors=base_colors,
-                         fig_size=(7,3),
+                         fig_size=(7,1.7),
                          target_path="grid.pdf"):
     x, y = data[:, 0], data[:, 1]
 
@@ -389,7 +402,9 @@ def plot_2d_distribution(data, n_quantiles=10, highlight_rectangle=None,
 
 
 def plot_grouped_scatter(df, grp1="Strategy", grp2="b", symb="s", yscale="log", 
-                                ymin=None, ymax=None, 
+                                ymin=None, ymax=None,
+                                figsize=(3.33,2),
+                                tick_tilt=0,
                                 path="./", exp_suffix="", show_errorbars=False, show_means="expand_some"):
     """
     Creates one plot per attribute for a dataframe with either 3-level or 4-level MultiIndex.
@@ -431,7 +446,7 @@ def plot_grouped_scatter(df, grp1="Strategy", grp2="b", symb="s", yscale="log",
     }
 
     for col in value_columns:
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=figsize)
 
         # Compute x-axis positions
         x_vals = df_flat[grp1].unique()
@@ -513,7 +528,7 @@ def plot_grouped_scatter(df, grp1="Strategy", grp2="b", symb="s", yscale="log",
         # Final plot setup
         ax = plt.gca()
         ax.set_xticks(range(len(x_vals)))
-        ax.set_xticklabels([l.replace("_"," ") for l in x_vals], rotation=25, ha='right')
+        ax.set_xticklabels([l.replace("_"," ") for l in x_vals], rotation=tick_tilt, ha='right')
 
         # plt.title(f"{exp_suffix}: {col} over Aggregated Trials")
         plt.ylabel(col.replace("_", " "))
@@ -545,7 +560,7 @@ def plot_grouped_scatter(df, grp1="Strategy", grp2="b", symb="s", yscale="log",
         plt.close()
 
 
-def plot_query_placement(df, reference_selectivity=None, figsize=(3.4,2.1), x_lim=(-0.000001,0.00002),
+def plot_query_placement(df, reference_selectivity=None, figsize=(3.33,2.1), x_lim=(-0.000001,0.00002),
                            show_error_bars=False,
                            x_col="Selectivity", y_col="Runtime_[ms]",
                            path= "./result_cardinality_vs_runtime.pdf"):
@@ -662,6 +677,7 @@ def plot_optimal_runtime(
     line_kws: dict | None = None,
     secondary_line_kws: dict | None = None,
     log_y: bool = False,
+    lfontsize=7
 ):
     """
     Aggregate ``df`` and create a Seaborn line plot with:
@@ -806,7 +822,9 @@ def plot_optimal_runtime(
         loc="center right",
         frameon=True,
         framealpha=1,
-        fontsize="small",
+        # fontsize="small",
+        fontsize=lfontsize,
+        labelspacing=0.2, handletextpad=0.3,
     )
 
     # ---------- 5. write and clean up ----------
@@ -827,7 +845,7 @@ def plot_runtime_vs_storage(
     base_colors: Optional[List[str]] = None,
     light: float = 0.3,
     dark: float = 0.9,
-    figsize: Tuple[float, float] = (3.4, 2.5),
+    figsize: Tuple[float, float],
     legend_fontsize: int = 7,
 ) -> None:
     """Scatter & optional guide line with distinct legend placement."""
@@ -838,7 +856,7 @@ def plot_runtime_vs_storage(
     pal = _make_shaded_palette(df_plot, base_colors, light, dark)
 
     fig, ax = plt.subplots(figsize=figsize)
-    fig.subplots_adjust(right=0.78)  # more margin for outside legend
+    # fig.subplots_adjust(right=0.78)  # more margin for outside legend
 
     # highlight guide lines
     if highlights:
@@ -871,7 +889,8 @@ def plot_runtime_vs_storage(
 
     _add_split_legends(fig, ax, df_plot, legend_fontsize=legend_fontsize)
 
-    fig.tight_layout()
+    # fig.tight_layout()
+    fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.02)
     fig.savefig(file_path, bbox_inches="tight")
     plt.close(fig)
 
@@ -886,7 +905,7 @@ def plot_vol_vs_overhead(
     base_colors: Optional[List[str]] = None,
     light: float = 0.3,
     dark: float = 0.9,
-    figsize: Tuple[float, float] = (3.4, 2.5),
+    figsize: Tuple[float, float],
     legend_fontsize: int = 7,
 ) -> None:
     """List count vs size with colour & marker legends."""
@@ -898,7 +917,7 @@ def plot_vol_vs_overhead(
     palette = _make_shaded_palette(df_plot, base_colors, light, dark)
 
     fig, ax = plt.subplots(figsize=figsize)
-    fig.subplots_adjust(right=0.78)
+    # fig.subplots_adjust(right=0.78)
 
     sns.scatterplot(
         data=df_plot, x=x, y=y,
@@ -928,8 +947,8 @@ def plot_vol_vs_overhead(
     ax.set_ylabel(y.replace("_", " "))
 
     _add_split_legends(fig, ax, df_plot, legend_fontsize=legend_fontsize)
-
-    fig.tight_layout()
+    fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.02)
+    # fig.tight_layout()
     fig.savefig(file_path, bbox_inches="tight")
     plt.close(fig)
 
@@ -1007,7 +1026,8 @@ def plot_runtime_vs_result_with_bars(
             fig.legend(handles=[extra_line],
                        loc="upper right",
                        title="VA-Scan",
-                       bbox_to_anchor=(1.0, 0.32), frameon=False)
+                       fontsize=6,
+                       bbox_to_anchor=(1.02, 0.32), frameon=False)
 
 
     # -------- scatter --------
@@ -1041,6 +1061,7 @@ def plot_runtime_vs_result_with_bars(
         for i, h in enumerate(unique_hues)
     ]
     fig.legend(hue_handles, unique_hues,
+               fontsize=6,
                title=",".join(color_by), loc="upper right", bbox_to_anchor=(1., 0.95), frameon=False)
 
     if style_by:
@@ -1052,13 +1073,14 @@ def plot_runtime_vs_result_with_bars(
                   title=style_by.replace("_", " ").title(), 
                   loc="upper left",
                   bbox_to_anchor=(0.0, 0.9),
+                  fontsize=6,
                   frameon=False)
 
     # -------- axis scaling --------
     ax.set_xscale("log")
     if yscale == "log":
         ax.set_yscale("log")
-        ax.yaxis.set_major_locator(LogLocator(base=10, numticks=6))
+        # ax.yaxis.set_major_locator(LogLocator(base=10, numticks=6))
         ax.yaxis.set_major_formatter(LogFormatter(labelOnlyBase=True))
         _force_minor_log_labels(ax, numticks=3)
         # ax.tick_params(axis="y", which="minor", labelsize=8, labelleft=True)
@@ -1075,7 +1097,8 @@ def plot_runtime_vs_result_with_bars(
 
 def dual_axis_curve_plot(
     df_primary, output_path, x_range=(0, 1), y_margin=0.05, df_secondary=None,
-    figsize=(3.4, 2), x_col='Relative Size', y_col='Time per Tuple [ns]', hue_col='b', style_col='b'):
+    tick_rotation=0,
+    figsize=(3.3, 1.1), x_col='Relative Size', y_col='Time per Tuple [ns]', hue_col='b', style_col='b'):
     """
     Plots a multi-line (styled) curve plot with optional dual y-axes:
     - df_primary is plotted on the primary y-axis
@@ -1128,8 +1151,9 @@ def dual_axis_curve_plot(
     all_x = pd.concat([df_primary[x_col]] + ([df_secondary[x_col]] if df_secondary is not None else []))
     x_ticks = sorted(all_x.unique())
     ax1.set_xticks(x_ticks)
-    ax1.set_xticklabels([str(x) for x in x_ticks], rotation=25, ha='right')
-    ax1.set_xlabel(x_col.replace("_"," "))
+    ax1.set_xticklabels([str(x) for x in x_ticks], rotation=tick_rotation, ha='right')
+    ax1.set_xlabel(x_col.replace("_"," "), labelpad=2)
+    ax1.tick_params(axis="x", pad=2)
 
     # Consolidate legends from both axes
     handles, labels = ax1.get_legend_handles_labels()
@@ -1137,7 +1161,7 @@ def dual_axis_curve_plot(
         handles2, labels2 = ax2.get_legend_handles_labels()
         handles += handles2
         labels += labels2
-    ax1.legend(handles, labels, loc='upper right')
+    ax1.legend(handles, labels, loc='upper right',labelspacing=0.2, handletextpad=0.2)
 
     plt.tight_layout()
     plt.savefig(output_path)
@@ -1156,14 +1180,14 @@ def plot_selectivity_runtime(
     x_attribute="Query Dim., D",
     dotted_value=("Any","VA"),
     zero_filter_attribute="Selectivity",
-    markersize=10,
+    markersize=5,
     log_y_axis=True,
     invert_x_axis=False,
     direction_label=None,
     x_tick_steps=(5,85,5),
-    color_legend_pos=(0.9, 0.1),
+    color_legend_pos=(0.88, 0.066),
     target_path=None,
-    figure_size=(3.33, 1.8),
+    figure_size=(3.33, 1.6),
     ax=None,
 ):
     """
@@ -1280,12 +1304,13 @@ def plot_selectivity_runtime(
     color_handles = [plt.Line2D([0], [0], color=col, lw=2) for col in color_map.values()]
     color_labels = [fmt_key(color_by, ck) for ck in color_map.keys()]
     legend1 = ax.legend(color_handles, color_labels, title=None, loc="lower right",
+                        fontsize=6, labelspacing=0.2, handletextpad=0.3,
                         bbox_to_anchor=color_legend_pos)# bbox_to_anchor=(1.02, 1), borderaxespad=0)
     ax.add_artist(legend1)
 
     symbol_handles = [plt.Line2D([0], [0], color="black", marker=mk, linestyle="None") for mk in marker_map.values()]
     symbol_labels = [fmt_key(symbol_by, sk, pfx="s=") for sk in marker_map.keys()]
-    ax.legend(symbol_handles, symbol_labels, title=None, loc="upper left")#, bbox_to_anchor=(1.02, 0), borderaxespad=0)
+    ax.legend(symbol_handles, symbol_labels, title=None, fontsize=6, loc="upper left",labelspacing=0.2, handletextpad=0.3)#, bbox_to_anchor=(1.02, 0), borderaxespad=0)
     
     # Add annotation pointing right from lower right corner
     if direction_label is not None:
@@ -1337,6 +1362,11 @@ def figure_2_and_3(source_path = data_folder / "plan_optimization_experiment.par
                    target_path = plot_folder):
     df = pd.read_parquet(source_path)
 
+    df["Strategy"] = df["Strategy"].replace("union_first","UF").replace("union_first_grouped","UFG")
+    df["Strategy"] = df["Strategy"].replace("expand_first","EF").replace("expand_first_sqrt_group","EFS")
+    df["Strategy"] = df["Strategy"].replace("expand_two","EF").replace("expand_some","A")
+
+
     max_runtime = df["Runtime_[ms]"].max()
     min_runtime = df["Runtime_[ms]"].min()
 
@@ -1366,7 +1396,7 @@ def figure_4(source_path = data_folder / "volume_optimal_experiment.parquet",
         annotate   = None,
         group_cols = ["Team_Count", "Type", "d"],
         pdf_path   = target_path,
-        figsize=(3.4, 1.5)
+        figsize=(3.4, 1.2)
     )
 
 
@@ -1384,13 +1414,13 @@ def figure_5_and_6(source_path = data_folder / "composition_variation_experiment
                          x = "Overhead", y = "Volume_[MB]",
                          highlights=[(5,"balanced_selective"), (10,"balanced_selective"), (10,"diverse")],
                          light=0.3,dark=0.9, base_colors = base_colors,
-                         figsize=(3.4, 2.5))
+                         legend_fontsize=7, figsize=(3.33, 2.2))
 
     plot_runtime_vs_storage(pareto_data.reset_index(), target_path / "figure_6_pareto.pdf",
                             x = "Total_Storage_Size_[GB]", y = "Runtime_[ms]",
                             highlights=[(10,"balanced"), (10,"balanced_selective"), (10,"diverse")],
                             light=0.3, dark=0.9, base_colors = base_colors,
-                            legend_fontsize=7, figsize=(3.4, 2.5))
+                            legend_fontsize=7, figsize=(3.33, 2.2))
 
 
 def figure_7(source_path = data_folder / "dimensional_scaling_experiment_LHCb.parquet",
@@ -1441,7 +1471,7 @@ def figure_8(data_path=data_folder / "SDSS_dimensional_scaling.parquet"):
                                     line_by=list(('s', 'Index')), symbol_by=("s",), color_by=("Index",),
                                     order_by="D", x_attribute="D",
                                     y_attribute="Runtime [s]",
-                                    figure_size=(3.3,1.8),
+                                    figure_size=(3.3,1.6),
                                     markersize=5,
                                     color_legend_pos=(0.88,0.066),
                                     target_path=plot_folder / "figure_8_dimensional_scaling_SDSS.pdf")
@@ -1449,9 +1479,11 @@ def figure_8(data_path=data_folder / "SDSS_dimensional_scaling.parquet"):
 def figure_9(source_path = data_folder / "table_scaling_experiment.parquet",
                  target_path = plot_folder / "figure_9_table_scaling.pdf"):
     results = pd.read_parquet(source_path)
+    results.rename(columns={"Time per Tuple [ns]": "Time/N [ns]"}, inplace=True)
     
     dual_axis_curve_plot(results, target_path,
-                         y_col="Time per Tuple [ns]",
+                         y_col="Time/N [ns]",
+                         figsize=(3.3, 1.2),
                          x_col="Relative Size", hue_col="b",style_col="b")
 
 def create_all():
@@ -1467,5 +1499,5 @@ def create_all():
     figure_9()
 
 if __name__ == "__main__":
-    create_all()
-    print("All figures created successfully.")
+   create_all()
+   print("All figures created successfully.")
