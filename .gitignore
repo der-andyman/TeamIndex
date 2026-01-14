@@ -1,3 +1,5 @@
 figures
 minimal_example/index_data
-minimal_example/uniform_toy_data.parquet
+uniform_toy_data.parquet
+build/
+stats_and_configs
