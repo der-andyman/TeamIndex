@@ -20,7 +20,7 @@ Running the index creation requires the python frontend to provide necessary met
     - code/python/TeamIndex/evaluation.py
 
 
-## Install Code
+## Install Code / External Dependencies
 Linux only, not tested for systems other than ubuntu and archlinux.
 
 First:
@@ -38,14 +38,14 @@ Then, clone the git project and change directory into the project folder. From w
 Optionally:
 - Enable additional compressions:
     - `ENABLE_FASTPFOR=true`
-        - Note: We use tag `v0.3.0`
 
 
-Note:
-- TaskFlow is a header-only external dependency we copied into a subfolder. We use GIT_TAG v3.9.0.
-    - There is a trivial changes to the TaskView class: We added a getter for the data() member of an underlying task (to implement custom time tracking using Observers).
-
-
+Further dependencies:
+- TaskFlow (https://github.com/taskflow/taskflow, v3.9.0) is a header-only external dependency we copied into a subfolder.
+    - There is a trivial change to the TaskView class: We added a getter for the data() member of an underlying task (to implement custom time tracking using Observers).
+- We also make use of nlohmann's json.hpp (https://github.com/nlohmann/json)
+- Via CMake, we automatically install roaring bitmaps (https://github.com/RoaringBitmap/CRoaring, v2.0.4) and zstd (https://github.com/facebook/zstd/, v1.5.5)
+- Optionally, we may also use FastPFor (https://github.com/fast-pack/FastPFor, v0.3.0) for additional list compressions
 ## Build
 
 With pip:
