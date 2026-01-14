@@ -24,8 +24,16 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde, entropy
 
 def get_new_default_runtime_config(worker_count=32, backend="liburing"):
+    def available_cpus():
+        try:
+            return len(os.sched_getaffinity(0))
+        except AttributeError:
+            return os.cpu_count() or 1
+        
+    core_cnt = min(available_cpus(), max(worker_count, 1))
+
     runtime_config = {
-                'worker_count': worker_count,
+                'worker_count': core_cnt,
                 'implementation': "standard",  # options:  only_io, standard
                 'backend': backend,  # options: liburing, dram
                 'experiment_name': None,
