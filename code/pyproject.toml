@@ -35,3 +35,4 @@ fallback_version = "0.0.0"
 [tool.scikit-build.cmake.define]
 ENABLE_FASTPFOR = true
 CMAKE_POLICY_VERSION_MINIMUM = "3.5" # silence a warning in the Roaring dependency
+ENABLE_STANDALONE = false

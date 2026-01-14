@@ -42,7 +42,7 @@ find_program(PYTHON_EXECUTABLE python3)
 option(ENABLE_FASTPFOR "Build with support for compression codecs from the FastPFOR library." ON)
 option(ENABLE_ROARING "Build with support for roaring bitmaps." ON)
 option(GENERATE_COMPILE_COMMANDS "Enable generation of compile_commands.json" OFF)
-
+option(ENABLE_STANDALONE "Build standalone_runtime executable" OFF)
 
 if(NOT DEFINED ZSTD_MORE_LEVEL)
     add_definitions(-DZSTD_MORE_LEVEL=20)
@@ -245,11 +245,12 @@ endif()
 
 
 ####################################################################################################
-
-add_executable(standalone_runtime ${PROJECT_SOURCE_DIR}/cpp/src/runtime/standalone_runtime.cpp)
-target_link_libraries(standalone_runtime PRIVATE ${PROJECT_NAME})
-target_include_directories(standalone_runtime PUBLIC ${PROJECT_SOURCE_DIR}/extern)
-
+if(ENABLE_STANDALONE)
+    add_executable(standalone_runtime ${PROJECT_SOURCE_DIR}/cpp/src/runtime/standalone_runtime.cpp)
+    target_link_libraries(standalone_runtime PRIVATE ${PROJECT_NAME})
+    target_include_directories(standalone_runtime PUBLIC ${PROJECT_SOURCE_DIR}/extern)
+    install(TARGETS standalone_runtime RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 #### Testing and benchmarking:
 ## benchmark target, without python
