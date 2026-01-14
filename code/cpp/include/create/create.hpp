@@ -469,7 +469,7 @@ namespace TeamIndex {
         get_quantile(const VALUETYPE value, const unsigned column) const {
 
             auto &bin_edges = _bin_edges[column];
-            for (unsigned bin_id = 0; bin_id < _shape[column]; bin_id++) {
+            for (unsigned bin_id = 0; bin_id < bin_edges.size(); bin_id++) {
                 if (value < bin_edges[bin_id]) {
                     return bin_id;
                 }
