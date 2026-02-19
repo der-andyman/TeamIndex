@@ -3,3 +3,21 @@ minimal_example/index_data
 uniform_toy_data.parquet
 build/
 stats_and_configs
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Runtime data inside minimal_example
+minimal_example/index_data/
+minimal_example/my_index_data
+minimal_example/my_results
+minimal_example/stats_and_configs
+
+
+# Ignore all parquet files
+*.parquet
+
+# Ignore all pdf files
+*.pdf

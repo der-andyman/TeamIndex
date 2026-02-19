@@ -22,13 +22,14 @@ execution_configuration = eva.get_new_default_runtime_config()
 # We can use a DRAM-based backend. Here, we will first load all indices to main memory, before starting processing.
 # May take longer on first start for large indices than just running the query (which only load parts of the index) on demand.
 # This is primarily used to avoid (most) storage I/O overhead when measuring index performance.
-execution_configuration["backend"] = "dram"
+execution_configuration["backend"] = "liburing"
 
-## Set the number of worker threads to use
+## Set the number of worker threads to usee
 #execution_configuration["worker_count"] = 8  # adjust or use default value determined by get_new_default_runtime_config
 
 ## Without this flag, no information will be printed. Useful when running many benchmarks
 execution_configuration["verbose_runtime"] = True  # include more details in the plan
+execution_configuration["StorageConfig"]["queue_pair_count"] = 3
 
 ## Enable printing of the execution plan. Needs to be rendered to pdf with a graph visualization tool, e.g., Graphviz:
 ## Will write the plan to the specified file path. Name will be adjust to include timestamp!
@@ -73,7 +74,7 @@ print("Running query:", query)
 index_result, runtime_stats, request_info, global_info = index.run_query(query, config=execution_configuration)
 
 print("Done. Index result cardinality:", len(index_result))
-print("First 10 result tuple IDs:", index_result[:10])
+print("First 10 result tuple IDs:\n" , index_result[:10])
 
 
 # We also support a non-python, "standalone" execution mode, where the query plan is fully optimized and prepared in python.
