@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 
 ## create a simple uniform dummy data set
-n = 400_000
+n = 1_000_000
 columns = ["A","B","C","D","E","F","G","H","I","J"]
 
 
@@ -36,7 +36,7 @@ index = eva.TeamIndex("./toy_index.json")
 # Note: only simple conjunctive WHERE clauses are supported right now
 query1 = "A < 19 and E < 19 and C < 19"
 query2 = "A < 19 and E < 19 and C < 19 and B < 19" # also restricts one attribute of a second Team, leading to index intersection
-query3 = "A < 38 and E < 38 and C < 38 and B < 38 and C < 19" # selects multiple bins per Team for slightly more complex intersection
+query3 = "A < 38 and E < 38 and C < 38 and B < 38 and C < 19 and F < 40" # selects multiple bins per Team for slightly more complex intersection
 
 ## use pandas query mechanism to produce reference results
 ref_result_q1 = set(table.query(query1).index)
@@ -59,9 +59,8 @@ print(ref_result_q3.issubset(res3[0]))
 ## The returned object also contains some statistics that can be used by the optimizer, such as access cardinalities.
 ## The object is a list of pairs [(team_name, optimization_options_dictionary)], sorted in ascending order of access volume
 manual_optimizations = index.prepare_optimization(query=query3)  # TODO: default strategy is still "union first"
-from pprint import pprint
 print("Before optimize:")
-pprint(manual_optimizations)
+print(manual_optimizations)
 
 ## The following function was used as the default optimization strategy for most experiments:
 
@@ -88,9 +87,13 @@ res3_optmized = index.run_query(query3, manual_optimizations=optimize(manual_opt
 opt = optimize(manual_optimizations)
 
 print("After optimize:")
-pprint(opt)
+print(opt)
 print("Checking last result, too:")
 print(ref_result_q3.issubset(res3_optmized[0]))
+print("Executiontime der res1 in Sekunden:")
+print(res1[1].executor_runtime / 1_000_000_000)
+print("Executiontime der res2 in Sekunden:")
+print(res2[1].executor_runtime / 1_000_000_000)
 
 print("Executiontime der res3 in Sekunden:")
 print(res3[1].executor_runtime / 1_000_000_000)
