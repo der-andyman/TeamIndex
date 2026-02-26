@@ -26,7 +26,7 @@ from benchmark import import_benchmark_data, plot_worker_tasks
 # 1. Datensatz erstellen oder laden
 ##################################################
 
-n = 500_000  # Anzahl Zeilen – nach Bedarf anpassen
+n = 1_000_000  # Anzahl Zeilen – nach Bedarf anpassen
 columns = ["A", "B", "C", "D", "E"]
 
 dataset_path = Path("./my_uniform_data.parquet")

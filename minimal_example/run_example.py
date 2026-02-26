@@ -59,6 +59,9 @@ print(ref_result_q3.issubset(res3[0]))
 ## The returned object also contains some statistics that can be used by the optimizer, such as access cardinalities.
 ## The object is a list of pairs [(team_name, optimization_options_dictionary)], sorted in ascending order of access volume
 manual_optimizations = index.prepare_optimization(query=query3)  # TODO: default strategy is still "union first"
+from pprint import pprint
+print("Before optimize:")
+pprint(manual_optimizations)
 
 ## The following function was used as the default optimization strategy for most experiments:
 
@@ -82,8 +85,16 @@ def optimize(mopts):
 
 
 res3_optmized = index.run_query(query3, manual_optimizations=optimize(manual_optimizations))
+opt = optimize(manual_optimizations)
+
+print("After optimize:")
+pprint(opt)
 print("Checking last result, too:")
 print(ref_result_q3.issubset(res3_optmized[0]))
 
+print("Executiontime der res3 in Sekunden:")
+print(res3[1].executor_runtime / 1_000_000_000)
+print("Executiontime der res3_optimized in Sekunden:")
+print(res3_optmized[1].executor_runtime / 1_000_000_000)
 print("You can inspect the index metadata, e.g., the first Team index's 5x5x5-many leaf cardinalities via")
 print("index.cardinalities[\"A-E-C\"].shape")
