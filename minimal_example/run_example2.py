@@ -22,7 +22,7 @@ execution_configuration = eva.get_new_default_runtime_config()
 # We can use a DRAM-based backend. Here, we will first load all indices to main memory, before starting processing.
 # May take longer on first start for large indices than just running the query (which only load parts of the index) on demand.
 # This is primarily used to avoid (most) storage I/O overhead when measuring index performance.
-execution_configuration["backend"] = "liburing"
+execution_configuration["backend"] = "dram"
 
 ## Set the number of worker threads to usee
 #execution_configuration["worker_count"] = 8  # adjust or use default value determined by get_new_default_runtime_config
