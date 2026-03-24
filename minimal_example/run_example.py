@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 
 ## create a simple uniform dummy data set
-n = 1_000_000
+n = 25_000_000  # number of tuples
 columns = ["A","B","C","D","E","F","G","H","I","J"]
 
 
