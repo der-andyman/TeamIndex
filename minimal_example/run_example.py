@@ -36,7 +36,7 @@ index = eva.TeamIndex("./toy_index.json")
 # Note: only simple conjunctive WHERE clauses are supported right now
 query1 = "A < 19 and E < 19 and C < 19"
 query2 = "A < 19 and E < 19 and C < 19 and B < 19" # also restricts one attribute of a second Team, leading to index intersection
-query3 = "A < 38 and E < 38 and C < 38 and B < 38 and C < 19 and F < 40" # selects multiple bins per Team for slightly more complex intersection
+query3 = "A < 38 and E < 38 and C < 19 and B < 38 and F < 40" # selects multiple bins per Team for slightly more complex intersection
 
 ## use pandas query mechanism to produce reference results
 ref_result_q1 = set(table.query(query1).index)
@@ -101,3 +101,6 @@ print("Executiontime der res3_optimized in Sekunden:")
 print(res3_optmized[1].executor_runtime / 1_000_000_000)
 print("You can inspect the index metadata, e.g., the first Team index's 5x5x5-many leaf cardinalities via")
 print("index.cardinalities[\"A-E-C\"].shape")
+
+print(res3[1].plan_construction_runtime)
+print(res3[1].executor_runtime)
