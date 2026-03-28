@@ -21,3 +21,10 @@ minimal_example/stats_and_configs
 
 # Ignore all pdf files
 *.pdf
+
+# Ignore all Files inside mopts_study and __pycache__
+minimal_example/mopts_study/
+minimal_example/__pycache__/
+
+# Ignore generated benchmark/study CSV artifacts
+minimal_example/*.csv
