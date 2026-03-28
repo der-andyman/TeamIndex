@@ -49,7 +49,11 @@ def get_new_default_runtime_config(worker_count=32, backend="liburing"):
                     'queue_pair_count': 16,
                     'liburingBackendConfig': {
                         'queue_depth': 256,
-                        'o_direct': True,
+                        # O_DIRECT currently produces incorrect results for some
+                        # multi-attribute queries on the liburing path. Keep the
+                        # safe buffered mode as the default until that backend
+                        # path is fixed.
+                        'o_direct': False,
                         'sq_poll': True,
                         'io_poll': False,
                         'sq_thread_idle': 4000

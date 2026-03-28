@@ -1123,7 +1123,7 @@ def run_query(cfg_path_: Path, query_, workers: int = None, compression: str = N
                                     "liburingBackendConfig": {
                                         "ring_count": workers,
                                         "queue_depth": 128,
-                                        "o_direct": True,
+                                        "o_direct": False,
                                         "sq_poll": True,
                                         "io_poll": False,
                                         "submit_batch_size": 1,

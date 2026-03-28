@@ -9,6 +9,10 @@ table = pd.read_parquet(DATA_PATH)
 index = eva.TeamIndex(INDEX_CONFIG)
 
 queries = [
+    "B < 30",
+    "I < 30",
+    "F < 30",
+    "H < 30",
     "B < 20 and I < 20",
     "B < 40 and I < 40",
     "B < 60 and I < 60",
@@ -17,12 +21,14 @@ queries = [
     "F < 60 and H < 60",
 ]
 
+
+
 for q in queries:
     ref = set(table.query(q).index)
     res = set(index.run_query(q)[0])
 
     print("\n", q)
-    print("ref:", len(ref))
-    print("idx:", len(res))
+    print("ref:", ref)
+    print("idx:", res)
     print("missing:", len(ref - res))
     print("extra:", len(res - ref))

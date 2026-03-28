@@ -397,6 +397,12 @@ def index_table(cfg_or_file_path, table = None, do_not_dump: bool = False, overw
         else:
             assert isinstance(table, pd.DataFrame), "table must be a pandas DataFrame!"
             team_data = table[list(team)].to_numpy(copy=False) # we hope the table has homogeneous data types, or this may become a copy...
+
+        # BatchConverter expects column-major input. Pandas does not guarantee
+        # that `.to_numpy(copy=False)` returns Fortran-contiguous storage,
+        # which can scramble the bin assignment for multi-attribute teams.
+        team_data = np.asfortranarray(team_data)
+
         arr_fortran = np.asfortranarray(qvals.values)  # actually unnecessary but we'll try to be safe
         converter = BatchConverter(arr_fortran)
         print("Preprocessing batch...")
