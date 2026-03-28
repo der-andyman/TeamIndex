@@ -688,6 +688,7 @@ def plot_worker_tasks(task_data, figure_path, type_color_mapping=None):
     ax.set_ylim(-1, len(worker_ids))
     
     fig.savefig(figure_path)
+    plt.close(fig)
 
 
 

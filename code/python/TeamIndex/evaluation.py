@@ -1671,6 +1671,21 @@ def serialize_workload_to_json(file_path: str,
                                storage_cfg,
                                other_info=None):
     output_path = Path(file_path)
+    def _json_safe(value):
+        if isinstance(value, dict):
+            return {k: _json_safe(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_json_safe(v) for v in value]
+        if isinstance(value, tuple):
+            return [_json_safe(v) for v in value]
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        if isinstance(value, np.bool_):
+            return bool(value)
+        return value
+
     def format_decomp_info(decomp_info):
         return json.dumps(
                 [[start_block, list_cardinality, codec_id_to_string(codec_id), list_size_compressed, group_id] 
@@ -1728,14 +1743,14 @@ def serialize_workload_to_json(file_path: str,
             }
         },
         "plan_config": {
-            "ise_count": plan_cfg["ise_count"],
-            "table_cardinality": plan_cfg["table_cardinality"],
-            "outer_union_term_count": plan_cfg["outer_union_term_count"],
-            "outer_union_group_count": plan_cfg["outer_union_group_count"],
-            "outer_intersection_term_count": plan_cfg["outer_intersection_term_count"],
-            "outer_intersection_group_count": plan_cfg["outer_intersection_group_count"],
-            "leaf_union_list_parallel_threshold": plan_cfg["leaf_union_list_parallel_threshold"],
-            "distributed_intersection_parallel_threshold": plan_cfg["distributed_intersection_parallel_threshold"],
+            "ise_count": int(plan_cfg["ise_count"]),
+            "table_cardinality": int(plan_cfg["table_cardinality"]),
+            "outer_union_term_count": int(plan_cfg["outer_union_term_count"]),
+            "outer_union_group_count": int(plan_cfg["outer_union_group_count"]),
+            "outer_intersection_term_count": int(plan_cfg["outer_intersection_term_count"]),
+            "outer_intersection_group_count": int(plan_cfg["outer_intersection_group_count"]),
+            "leaf_union_list_parallel_threshold": int(plan_cfg["leaf_union_list_parallel_threshold"]),
+            "distributed_intersection_parallel_threshold": int(plan_cfg["distributed_intersection_parallel_threshold"]),
             
         }
     }
@@ -1752,7 +1767,7 @@ def serialize_workload_to_json(file_path: str,
         data["executor_config"]["experiment_name"] = str(executor_cfg.experiment_name)
     
 
-    data.update(other_info or {})
+    data.update(_json_safe(other_info or {}))
 
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, separators=(",", ": "))
+        json.dump(_json_safe(data), f, indent=4, separators=(",", ": "))
