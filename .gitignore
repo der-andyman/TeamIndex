@@ -26,5 +26,7 @@ minimal_example/stats_and_configs
 minimal_example/mopts_study/
 minimal_example/__pycache__/
 
+# Ignore temporary files
+minimal_example/temp_data/
 # Ignore generated benchmark/study CSV artifacts
 minimal_example/*.csv
