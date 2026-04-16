@@ -13,11 +13,10 @@ import pandas as pd
 
 from TeamIndex import benchmark as tib
 from TeamIndex import evaluation as eva
+from example_paths import DATA_PATH, INDEX_CONFIG
 
 
 BASE_DIR = Path(__file__).resolve().parent
-INDEX_CONFIG = BASE_DIR / "toy_index.json"
-DATA_PATH = BASE_DIR / "uniform_toy_data.parquet"
 OUT_DIR = (BASE_DIR / "mopts_study").resolve()
 GENERATE_WORKER_PLOTS = False
 
@@ -42,8 +41,27 @@ def clone_mopts(mopts):
     return [(team_name, copy.deepcopy(opts)) for team_name, opts in mopts]
 
 
-def manual_baseline_current(index: eva.TeamIndex, query: str):
-    # Mirrors the optimizer from run_example.py.
+def manual_baseline_naive(index: eva.TeamIndex, query: str):
+    # Naivste noch sinnvolle Baseline:
+    # - uebernehme nur die von prepare_optimization bestimmte Team-Reihenfolge
+    # - keine Expansion
+    # - keine manuelle Aenderung der group_count-Werte
+    #
+    # Dadurch entsteht ein gueltiger, aber bewusst "unsmarter" Plan:
+    # jedes Team wird im Wesentlichen lokal vereinigt und erst danach
+    # mit den anderen Teams kombiniert.
+    return clone_mopts(index.prepare_optimization(query=query))
+
+
+def manual_current_handcrafted(index: eva.TeamIndex, query: str):
+    # Aktuelle handgeschriebene Heuristik aus run_example.py:
+    # - expandiere immer das erste / kleinste Team
+    # - falls dieses Team danach nur wenige Gruppen hat, expandiere auch Team 2
+    # - begrenze group_count mit festen Schranken (128 bzw. 16)
+    #
+    # Idee:
+    # kleine/selective Teams frueh aufspalten, damit nachgelagerte
+    # Schnitte feingranularer und oft guenstiger werden.
     mopts = clone_mopts(index.prepare_optimization(query=query))
     assert len(mopts) >= 1, "Empty result?"
 
@@ -66,41 +84,83 @@ def manual_baseline_current(index: eva.TeamIndex, query: str):
     return mopts
 
 
-def manual_no_expansion_grouped(index: eva.TeamIndex, query: str):
-    # Never expand. Only use grouping to reduce leaf-union overhead.
+def manual_overhead_aware(index: eva.TeamIndex, query: str):
+    # Overhead-aware Heuristik:
+    # - niemals expandieren
+    # - nur dann gruppieren, wenn ein Team wirklich viele Blaetter trifft
+    # - Gruppierung bewusst konservativ halten
+    #
+    # Idee:
+    # Wenn nur wenige Blaetter / Listen betroffen sind, ist zusaetzliche
+    # Optimierungslogik oft nur Overhead. Diese Strategie versucht,
+    # unnoetige Parallelisierung und zusaetzliche Task-Aufblaehung zu vermeiden.
     mopts = clone_mopts(index.prepare_optimization(query=query))
     for _, opt in mopts:
         opt["is_expanded"] = False
-        if opt["max_group_count"] > 128:
-            opt["group_count"] = min(eva.po2_near_sqrt(opt["max_group_count"]), 128)
+
+        # Nur bei groesseren Blattzahlen eingreifen.
+        if opt["max_group_count"] >= 64:
+            opt["group_count"] = min(eva.po2_near_sqrt(opt["max_group_count"]), 64)
+        elif opt["max_group_count"] >= 24:
+            opt["group_count"] = min(eva.po2_near_sqrt(opt["max_group_count"]), 24)
+
     return mopts
 
 
-def manual_aggressive_expansion(index: eva.TeamIndex, query: str):
-    # Expand more than the current baseline, but stop once the ISE fanout becomes too large.
+def manual_imbalance_aware(index: eva.TeamIndex, query: str):
+    # Imbalance-aware Heuristik:
+    # - sortiere Teams explizit nach union_cardinality und Blattzahl
+    # - expandiere nur das kleinste Team
+    # - halte die restlichen Teams konservativ gruppiert
+    #
+    # Idee:
+    # Wenn Teams sehr unterschiedlich gross sind, sollte ein kleines Team
+    # moeglichst frueh "dominieren", damit grosse Zwischenmengen vermieden werden.
     mopts = clone_mopts(index.prepare_optimization(query=query))
-    ise_budget = 64
-    current_ise = 1
+    if not mopts:
+        return mopts
 
-    for i, (_, opt) in enumerate(mopts):
-        limit = 64 if i == 0 else 16
-        if opt["max_group_count"] > limit:
-            opt["group_count"] = min(eva.po2_near_sqrt(opt["max_group_count"]), limit)
+    mopts = sorted(
+        mopts,
+        key=lambda item: (
+            item[1]["union_cardinality"],
+            item[1]["max_group_count"],
+        ),
+    )
 
-        proposed_ise = current_ise * opt["group_count"]
-        if proposed_ise <= ise_budget:
-            opt["is_expanded"] = True
-            current_ise = proposed_ise
-        else:
-            opt["is_expanded"] = False
+    # Einfache Imbalance-Abschaetzung auf Basis der Team-Kardinalitaeten.
+    union_cards = [opt["union_cardinality"] for _, opt in mopts]
+    imbalance = (max(union_cards) / min(union_cards)) if min(union_cards) > 0 else None
 
-    if mopts:
-        mopts[0][1]["is_expanded"] = True
+    mopts[0][1]["is_expanded"] = True
+    if mopts[0][1]["max_group_count"] > 64:
+        mopts[0][1]["group_count"] = min(eva.po2_near_sqrt(mopts[0][1]["max_group_count"]), 64)
+
+    # Bei starker Imbalance sehr konservativ bleiben, damit das groesste Team
+    # nicht noch mehr Overhead erzeugt.
+    remaining_limit = 16 if imbalance is not None and imbalance >= 8 else 32
+    for i in range(1, len(mopts)):
+        mopts[i][1]["is_expanded"] = False
+        if mopts[i][1]["max_group_count"] > remaining_limit:
+            mopts[i][1]["group_count"] = min(
+                eva.po2_near_sqrt(mopts[i][1]["max_group_count"]),
+                remaining_limit,
+            )
+
     return mopts
 
 
 def manual_leaf_count_aware(index: eva.TeamIndex, query: str):
-    # Reorder teams by number of touched leaves first, then fall back to union size.
+    # Leaf-count-aware Heuristik:
+    # - sortiere Teams primaer nach Zahl getroffener Blaetter (max_group_count)
+    # - bei Gleichstand nach union_cardinality
+    # - expandiere nur das erste Team
+    # - gruppiere weitere Teams moderat
+    #
+    # Unterschied zur Standardsortierung:
+    # prepare_optimization ordnet primär nach union_cardinality.
+    # Diese Heuristik priorisiert dagegen Teams mit wenigen betroffenen
+    # Blaettern/Listen und ist damit eher overhead-orientiert.
     mopts = clone_mopts(index.prepare_optimization(query=query))
     if not mopts:
         return mopts
@@ -123,19 +183,24 @@ def manual_leaf_count_aware(index: eva.TeamIndex, query: str):
 
 VARIANTS = [
     {
-        "name": "baseline_current",
+        "name": "baseline_naive",
+        "description": "Prepared team order only, no expansion and no manual regrouping",
+        "builder": manual_baseline_naive,
+    },
+    {
+        "name": "current_handcrafted",
         "description": "Current handwritten optimizer from run_example.py",
-        "builder": manual_baseline_current,
+        "builder": manual_current_handcrafted,
     },
     {
-        "name": "no_expansion_grouped",
-        "description": "No expansion, only leaf grouping to reduce request and union overhead",
-        "builder": manual_no_expansion_grouped,
+        "name": "overhead_aware",
+        "description": "Avoid unnecessary expansion and only group when many leaves are touched",
+        "builder": manual_overhead_aware,
     },
     {
-        "name": "aggressive_expansion",
-        "description": "Expand multiple teams until an ISE budget is reached",
-        "builder": manual_aggressive_expansion,
+        "name": "imbalance_aware",
+        "description": "Prioritize very small teams and stay conservative on strongly imbalanced queries",
+        "builder": manual_imbalance_aware,
     },
     {
         "name": "leaf_count_aware",
@@ -187,6 +252,11 @@ def parse_args():
         "--convert-only",
         action="store_true",
         help="Only convert existing execution_plan DOT files to PDFs.",
+    )
+    parser.add_argument(
+        "--no-reference",
+        action="store_true",
+        help="Skip loading the large parquet file and do not compute pandas-based correctness references.",
     )
     return parser.parse_args()
 
@@ -247,6 +317,78 @@ def summarize_mopts(query_id, query_name, query, variant_name, mopts, request_in
     return rows
 
 
+def ratio_or_none(values):
+    if not values:
+        return None
+    min_value = min(values)
+    max_value = max(values)
+    if min_value == 0:
+        return None
+    return max_value / min_value
+
+
+def classify_query_domain(team_count, total_leaf_hits, imbalance_group_count):
+    if team_count <= 1:
+        if total_leaf_hits <= 8:
+            return "single_team_small"
+        return "single_team_wide"
+    if team_count == 2:
+        if imbalance_group_count is not None and imbalance_group_count >= 4:
+            return "two_team_imbalanced"
+        if total_leaf_hits <= 16:
+            return "two_team_small"
+        return "two_team_balanced"
+    if total_leaf_hits <= 24:
+        return "multi_team_medium"
+    return "multi_team_wide"
+
+
+def summarize_query_structure(mopts):
+    if not mopts:
+        return {
+            "team_count": 0,
+            "included_team_count_manual": 0,
+            "expanded_team_count_manual": 0,
+            "sum_max_group_count": 0,
+            "sum_group_count": 0,
+            "min_max_group_count": None,
+            "max_max_group_count": None,
+            "imbalance_group_count": None,
+            "sum_union_cardinality": 0,
+            "min_union_cardinality": None,
+            "max_union_cardinality": None,
+            "imbalance_union_cardinality": None,
+            "query_domain": "empty",
+        }
+
+    max_group_counts = [int(opts["max_group_count"]) for _, opts in mopts]
+    group_counts = [int(opts["group_count"]) for _, opts in mopts]
+    union_cards = [int(opts["union_cardinality"]) for _, opts in mopts]
+    included_count = sum(1 for _, opts in mopts if opts["is_included"])
+    expanded_count = sum(1 for _, opts in mopts if opts["is_expanded"])
+    imbalance_group_count = ratio_or_none(max_group_counts)
+
+    return {
+        "team_count": len(mopts),
+        "included_team_count_manual": included_count,
+        "expanded_team_count_manual": expanded_count,
+        "sum_max_group_count": sum(max_group_counts),
+        "sum_group_count": sum(group_counts),
+        "min_max_group_count": min(max_group_counts),
+        "max_max_group_count": max(max_group_counts),
+        "imbalance_group_count": imbalance_group_count,
+        "sum_union_cardinality": sum(union_cards),
+        "min_union_cardinality": min(union_cards),
+        "max_union_cardinality": max(union_cards),
+        "imbalance_union_cardinality": ratio_or_none(union_cards),
+        "query_domain": classify_query_domain(
+            team_count=len(mopts),
+            total_leaf_hits=sum(max_group_counts),
+            imbalance_group_count=imbalance_group_count,
+        ),
+    }
+
+
 def plot_runtime_comparison(df: pd.DataFrame, figure_path: Path):
     pivot = df.pivot(index="query_name", columns="variant", values="executor_runtime_ms")
     ax = pivot.plot(kind="bar", figsize=(12, 6))
@@ -261,7 +403,7 @@ def plot_runtime_comparison(df: pd.DataFrame, figure_path: Path):
 
 def plot_speedup_vs_baseline(df: pd.DataFrame, figure_path: Path):
     baseline = (
-        df[df["variant"] == "baseline_current"][["query_name", "executor_runtime_ms"]]
+        df[df["variant"] == "baseline_naive"][["query_name", "executor_runtime_ms"]]
         .rename(columns={"executor_runtime_ms": "baseline_runtime_ms"})
     )
     merged = df.merge(baseline, on="query_name", how="left")
@@ -270,9 +412,9 @@ def plot_speedup_vs_baseline(df: pd.DataFrame, figure_path: Path):
 
     pivot = merged.pivot(index="query_name", columns="variant", values="speedup_vs_baseline")
     ax = pivot.plot(kind="bar", figsize=(12, 6))
-    ax.set_ylabel("Speedup vs baseline_current")
+    ax.set_ylabel("Speedup vs baseline_naive")
     ax.set_xlabel("Query")
-    ax.set_title("Speedup Relative to the Current Baseline Optimizer")
+    ax.set_title("Speedup Relative to the Naive Baseline")
     ax.axhline(1.0, color="black", linestyle="--", linewidth=1.0)
     ax.grid(axis="y", linestyle="--", linewidth=0.5)
     plt.tight_layout()
@@ -294,17 +436,20 @@ def main():
             print("No execution_plan DOT files found in graphs/.")
         return
 
-    table = pd.read_parquet(DATA_PATH)
+    table = None if args.no_reference else pd.read_parquet(DATA_PATH)
     index = eva.TeamIndex(INDEX_CONFIG)
 
     result_rows = []
     mopts_rows = []
 
     for query_id, (query_name, query) in enumerate(QUERIES, start=1):
-        ref = set(table.query(query).index)
+        ref = set(table.query(query).index) if table is not None else None
         print(f"\n=== {query_name} ===")
         print(query)
-        print("Reference result size:", len(ref))
+        if ref is not None:
+            print("Reference result size:", len(ref))
+        else:
+            print("Reference result size: skipped (--no-reference)")
 
         for variant in VARIANTS:
             variant_name = variant["name"]
@@ -317,6 +462,8 @@ def main():
             else:
                 manual_mopts = variant["builder"](index, query)
                 executed_mopts = clone_mopts(manual_mopts)
+
+            query_structure = summarize_query_structure(executed_mopts)
 
             result_ids, runtime_stats, request_info, global_info = index.run_query(
                 query,
@@ -353,11 +500,12 @@ def main():
                     "query": query,
                     "variant": variant_name,
                     "variant_description": variant["description"],
-                    "ref_size": len(ref),
+                    **query_structure,
+                    "ref_size": len(ref) if ref is not None else None,
                     "result_size": len(result_ids),
-                    "correct_subset": ref.issubset(result_ids),
-                    "missing_true_hits": len(ref - result_ids),
-                    "extra_hits": len(result_ids - ref),
+                    "correct_subset": ref.issubset(result_ids) if ref is not None else None,
+                    "missing_true_hits": len(ref - result_ids) if ref is not None else None,
+                    "extra_hits": len(result_ids - ref) if ref is not None else None,
                     "executor_runtime_ms": runtime_stats.executor_runtime / 1_000_000,
                     "plan_runtime_ms": runtime_stats.plan_construction_runtime / 1_000_000,
                     "total_request_count": global_info["total_request_count"],
@@ -390,14 +538,15 @@ def main():
 
             print(
                 f"{variant_name}: runtime={runtime_stats.executor_runtime / 1_000_000:.3f} ms, "
-                f"missing={len(ref - result_ids)}, extra={len(result_ids - ref)}, "
+                f"missing={(len(ref - result_ids) if ref is not None else 'n/a')}, "
+                f"extra={(len(result_ids - ref) if ref is not None else 'n/a')}, "
                 f"result={len(result_ids)}"
             )
 
     results_df = pd.DataFrame(result_rows)
     mopts_df = pd.DataFrame(mopts_rows)
 
-    baseline_df = results_df[results_df["variant"] == "baseline_current"][
+    baseline_df = results_df[results_df["variant"] == "baseline_naive"][
         ["query_name", "executor_runtime_ms"]
     ].rename(columns={"executor_runtime_ms": "baseline_runtime_ms"})
     comparison_df = results_df.merge(baseline_df, on="query_name", how="left")

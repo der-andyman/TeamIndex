@@ -2,18 +2,37 @@ from TeamIndex import evaluation as eva
 from TeamIndex import creation as crt
 
 
+import copy
+import json
 import numpy as np
 import pandas as pd
 
 from pathlib import Path
+from example_paths import (
+    BASE_DIR,
+    DATA_PATH,
+    INDEX_CONFIG,
+    INDEX_DATA_DIR,
+    SCRATCH_ROOT,
+    SOURCE_INDEX_CONFIG,
+)
 
 ## create a simple uniform dummy data set
-n = 1_000_000  # number of tuples
+n = 1_000_000_000  # number of tuples
 columns = ["A","B","C","D","E","F","G","H","I","J"]
 
+SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
 
 # note: make sure the data generated here is also used for the index created later, otherwise there will be a missmatch when checking results.
-target_path = Path("./uniform_toy_data.parquet")  # will be roughly ~33MB in size
+target_path = DATA_PATH  # will be roughly ~33GB in size
+
+with SOURCE_INDEX_CONFIG.open("r", encoding="utf-8") as handle:
+    scratch_cfg = json.load(handle)
+scratch_cfg = copy.deepcopy(scratch_cfg)
+scratch_cfg["index_folder"] = str(INDEX_DATA_DIR.resolve())
+
+with INDEX_CONFIG.open("w", encoding="utf-8") as handle:
+    json.dump(scratch_cfg, handle, indent=4)
 
 
 if not target_path.exists():
@@ -26,10 +45,10 @@ else:
 ## In the example, we group attributes A-J into the Teams [['A', 'E', 'C'], ['J', 'D', 'G'], ['B', 'I'], ['F', 'H']] with 5 bins per dimension.
 ## Note:    The toy_index.json file already contains quantiles for the dataset, which would ideally be recomputed before creating the index.
 ##          You can use "from TeamIndex.creation import determine_quantiles, create_configs"
-crt.index_table("./toy_index.json", table=table)  # will not overwrite existing index data by default
+crt.index_table(INDEX_CONFIG, table=table)  # will not overwrite existing index data by default
 
 ## Open the index, it can now be queried
-index = eva.TeamIndex("./toy_index.json")
+index = eva.TeamIndex(INDEX_CONFIG)
 
 ## Example queries
 # select just the very first cell in one of the Team indices, which spans roughly the interval [[0,19],[0,19],[0,19]]

@@ -1,12 +1,13 @@
 from TeamIndex import evaluation as eva
 
 from pathlib import Path
+from example_paths import INDEX_CONFIG
 
 ##################################################
 ## Load existing index (run other example to create it first!)
 ##################################################
 
-index = eva.TeamIndex("./toy_index.json")
+index = eva.TeamIndex(INDEX_CONFIG)
 
 # create subfolder for results etc.
 subfolder = Path("./stats_and_configs/")
