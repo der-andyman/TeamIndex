@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import math
 import shutil
 import subprocess
 from pathlib import Path
@@ -19,6 +20,7 @@ from example_paths import DATA_PATH, INDEX_CONFIG
 BASE_DIR = Path(__file__).resolve().parent
 OUT_DIR = (BASE_DIR / "mopts_study").resolve()
 GENERATE_WORKER_PLOTS = False
+MAIN_BASELINE_VARIANT = "baseline_minimal_intersection"
 
 
 # A compact, explainable query set that covers:
@@ -41,20 +43,61 @@ def clone_mopts(mopts):
     return [(team_name, copy.deepcopy(opts)) for team_name, opts in mopts]
 
 
-def manual_baseline_naive(index: eva.TeamIndex, query: str):
-    # Naivste noch sinnvolle Baseline:
+def product(values):
+    return math.prod(values) if values else 0
+
+
+def manual_baseline_union_first(index: eva.TeamIndex, query: str):
+    # Baseline: Union First
+    # ---------------------
+    # Was passiert?
     # - uebernehme nur die von prepare_optimization bestimmte Team-Reihenfolge
     # - keine Expansion
-    # - keine manuelle Aenderung der group_count-Werte
+    # - keine zusaetzliche Gruppierung
     #
-    # Dadurch entsteht ein gueltiger, aber bewusst "unsmarter" Plan:
-    # jedes Team wird im Wesentlichen lokal vereinigt und erst danach
-    # mit den anderen Teams kombiniert.
+    # Idee dahinter:
+    # Diese Variante ist der minimale gueltige Referenzplan:
+    # Innerhalb jedes Teams werden zuerst alle getroffenen Blaetter vereinigt.
+    # Danach werden die fertigen Team-Ergebnisse miteinander geschnitten.
+    #
+    # Wichtig:
+    # Das ist bewusst keine "gute" Optimierung, sondern eine einfache
+    # theoretische Referenz. Sie zeigt, was passiert, wenn keine logische
+    # Intersection-Optimierung vorgenommen wird.
     return clone_mopts(index.prepare_optimization(query=query))
 
 
+def manual_baseline_minimal_intersection(index: eva.TeamIndex, query: str):
+    # Baseline: Minimal Intersection
+    # ------------------------------
+    # Was passiert?
+    # - sortiere wie prepare_optimization nach union_cardinality
+    # - expandiere genau das kleinste/selectivste Team
+    # - keine weitere Gruppierung
+    # - kein zweites expandiertes Team
+    #
+    # Idee dahinter:
+    # Das ist die einfachste Intersection-orientierte Baseline:
+    # Ein kleines Team wird in die Intersections hineingezogen, damit
+    # Zwischenergebnisse frueher reduziert werden koennen. Gleichzeitig
+    # bleibt die Strategie bewusst minimal und wird nicht zu einer Kopie
+    # der handgeschriebenen Heuristik aus run_example.py.
+    mopts = clone_mopts(index.prepare_optimization(query=query))
+    if not mopts:
+        return mopts
+
+    # Bei Single-Team-Queries gibt es zwischen Teams nichts zu schneiden.
+    if len(mopts) == 1:
+        return mopts
+
+    mopts[0][1]["is_expanded"] = True
+    return mopts
+
+
 def manual_current_handcrafted(index: eva.TeamIndex, query: str):
-    # Aktuelle handgeschriebene Heuristik aus run_example.py:
+    # Optimizer: Current Handcrafted
+    # --------------------------------
+    # Was passiert?
     # - expandiere immer das erste / kleinste Team
     # - falls dieses Team danach nur wenige Gruppen hat, expandiere auch Team 2
     # - begrenze group_count mit festen Schranken (128 bzw. 16)
@@ -84,108 +127,106 @@ def manual_current_handcrafted(index: eva.TeamIndex, query: str):
     return mopts
 
 
-def manual_overhead_aware(index: eva.TeamIndex, query: str):
-    # Overhead-aware Heuristik:
-    # - niemals expandieren
-    # - nur dann gruppieren, wenn ein Team wirklich viele Blaetter trifft
-    # - Gruppierung bewusst konservativ halten
+def manual_expand_all_unbounded(index: eva.TeamIndex, query: str):
+    # Optimizer: Expand All Unbounded
+    # --------------------------------
+    # Was passiert?
+    # - expandiere jedes beteiligte Team
+    # - keine Gruppierung
     #
     # Idee:
-    # Wenn nur wenige Blaetter / Listen betroffen sind, ist zusaetzliche
-    # Optimierungslogik oft nur Overhead. Diese Strategie versucht,
-    # unnoetige Parallelisierung und zusaetzliche Task-Aufblaehung zu vermeiden.
+    # Dies ist der aggressive Gegenpol zu Union First. Alle getroffenen
+    # Team-Blaetter/Gruppen werden so frueh wie moeglich in Intersections
+    # hineingezogen.
+    #
+    # Erwartung:
+    # Diese Strategie kann stark profitieren, wenn fruehe Intersections
+    # sehr selektiv sind. Sie kann aber auch massiv schaden, weil der
+    # ISE Count als Produkt aller group_count-Werte explodieren kann.
     mopts = clone_mopts(index.prepare_optimization(query=query))
     for _, opt in mopts:
-        opt["is_expanded"] = False
-
-        # Nur bei groesseren Blattzahlen eingreifen.
-        if opt["max_group_count"] >= 64:
-            opt["group_count"] = min(eva.po2_near_sqrt(opt["max_group_count"]), 64)
-        elif opt["max_group_count"] >= 24:
-            opt["group_count"] = min(eva.po2_near_sqrt(opt["max_group_count"]), 24)
+        opt["is_expanded"] = True
 
     return mopts
 
 
-def manual_imbalance_aware(index: eva.TeamIndex, query: str):
-    # Imbalance-aware Heuristik:
-    # - sortiere Teams explizit nach union_cardinality und Blattzahl
-    # - expandiere nur das kleinste Team
-    # - halte die restlichen Teams konservativ gruppiert
+def manual_expand_all_adaptive_grouping(index: eva.TeamIndex, query: str):
+    # Optimizer: Expand All Adaptive Grouping
+    # ---------------------------------------
+    # Was passiert?
+    # - expandiere grundsaetzlich alle beteiligten Teams
+    # - gruppiere nicht bei trivial kleinen Plaenen
+    # - wenn die rohe ISE-Komplexitaet hoch ist, gruppiere dynamisch
+    # - gruppiere grosse/unselektive Teams staerker als kleine/selective Teams
     #
     # Idee:
-    # Wenn Teams sehr unterschiedlich gross sind, sollte ein kleines Team
-    # moeglichst frueh "dominieren", damit grosse Zwischenmengen vermieden werden.
-    mopts = clone_mopts(index.prepare_optimization(query=query))
-    if not mopts:
-        return mopts
-
-    mopts = sorted(
-        mopts,
-        key=lambda item: (
-            item[1]["union_cardinality"],
-            item[1]["max_group_count"],
-        ),
-    )
-
-    # Einfache Imbalance-Abschaetzung auf Basis der Team-Kardinalitaeten.
-    union_cards = [opt["union_cardinality"] for _, opt in mopts]
-    imbalance = (max(union_cards) / min(union_cards)) if min(union_cards) > 0 else None
-
-    mopts[0][1]["is_expanded"] = True
-    if mopts[0][1]["max_group_count"] > 64:
-        mopts[0][1]["group_count"] = min(eva.po2_near_sqrt(mopts[0][1]["max_group_count"]), 64)
-
-    # Bei starker Imbalance sehr konservativ bleiben, damit das groesste Team
-    # nicht noch mehr Overhead erzeugt.
-    remaining_limit = 16 if imbalance is not None and imbalance >= 8 else 32
-    for i in range(1, len(mopts)):
-        mopts[i][1]["is_expanded"] = False
-        if mopts[i][1]["max_group_count"] > remaining_limit:
-            mopts[i][1]["group_count"] = min(
-                eva.po2_near_sqrt(mopts[i][1]["max_group_count"]),
-                remaining_limit,
-            )
-
-    return mopts
-
-
-def manual_leaf_count_aware(index: eva.TeamIndex, query: str):
-    # Leaf-count-aware Heuristik:
-    # - sortiere Teams primaer nach Zahl getroffener Blaetter (max_group_count)
-    # - bei Gleichstand nach union_cardinality
-    # - expandiere nur das erste Team
-    # - gruppiere weitere Teams moderat
+    # Fruehes Intersecten ist oft gut, aber ungebremstes Expandieren kann
+    # zu viele ISEs erzeugen. Diese Strategie versucht deshalb, alle Teams
+    # fuer fruehe Intersections nutzbar zu machen, reduziert aber die
+    # Granularitaet dort, wo sie voraussichtlich wenig bringt:
+    # bei Teams mit hoher union_cardinality und vielen getroffenen Blaettern.
     #
-    # Unterschied zur Standardsortierung:
-    # prepare_optimization ordnet primär nach union_cardinality.
-    # Diese Heuristik priorisiert dagegen Teams mit wenigen betroffenen
-    # Blaettern/Listen und ist damit eher overhead-orientiert.
+    # Es gibt bewusst kein festes ISE_LIMIT. Stattdessen wird die
+    # Gruppierungsstaerke aus raw_ise_count, Teamanzahl und Teamgroessen
+    # abgeleitet. Je groesser die rohe ISE Count, desto staerker wird
+    # gruppiert.
     mopts = clone_mopts(index.prepare_optimization(query=query))
     if not mopts:
         return mopts
 
-    mopts = sorted(
-        mopts,
-        key=lambda item: (item[1]["max_group_count"], item[1]["union_cardinality"]),
-    )
+    for _, opt in mopts:
+        opt["is_expanded"] = True
 
-    mopts[0][1]["is_expanded"] = True
-    if mopts[0][1]["max_group_count"] > 64:
-        mopts[0][1]["group_count"] = min(eva.po2_near_sqrt(mopts[0][1]["max_group_count"]), 64)
+    max_group_counts = [max(1, int(opt["max_group_count"])) for _, opt in mopts]
+    raw_ise_count = product(max_group_counts)
+    team_count = len(mopts)
 
-    for i in range(1, len(mopts)):
-        if mopts[i][1]["max_group_count"] > 32:
-            mopts[i][1]["group_count"] = min(eva.po2_near_sqrt(mopts[i][1]["max_group_count"]), 32)
+    # Bei sehr kleinen Plaenen wuerde Gruppierung den Vorteil der Expansion
+    # oft zerstoeren. Dort bleibt die Variante expand_all ohne Gruppierung.
+    if team_count <= 1 or raw_ise_count <= 16:
+        return mopts
+
+    union_cards = [max(1, int(opt["union_cardinality"])) for _, opt in mopts]
+    min_union_card = min(union_cards)
+
+    # Dynamische Daempfung:
+    # - raw_ise_factor waechst mit der rohen ISE-Komplexitaet pro Team
+    # - alpha nahe 1 bedeutet wenig Gruppierung
+    # - alpha kleiner bedeutet staerkere Gruppierung
+    raw_ise_factor = max(1.0, math.log10(raw_ise_count) / team_count)
+    alpha = max(0.35, min(0.90, 1.0 / raw_ise_factor))
+
+    for _, opt in mopts:
+        max_groups = max(1, int(opt["max_group_count"]))
+        if max_groups <= 2:
+            continue
+
+        union_card = max(1, int(opt["union_cardinality"]))
+        relative_size = union_card / min_union_card
+
+        # Grosse/unselektive Teams bekommen einen etwas kleineren Exponenten
+        # und werden dadurch staerker gruppiert. Kleine/selective Teams
+        # behalten mehr Granularitaet, weil sie frueh gut filtern koennen.
+        team_alpha = alpha / min(1.8, relative_size ** 0.15)
+        team_alpha = max(0.25, min(0.90, team_alpha))
+
+        grouped_count = int(round(max_groups ** team_alpha))
+        grouped_count = max(1, min(grouped_count, max_groups - 1))
+        opt["group_count"] = grouped_count
 
     return mopts
 
 
 VARIANTS = [
     {
-        "name": "baseline_naive",
-        "description": "Prepared team order only, no expansion and no manual regrouping",
-        "builder": manual_baseline_naive,
+        "name": "baseline_union_first",
+        "description": "Union-first reference: no expansion and no manual grouping",
+        "builder": manual_baseline_union_first,
+    },
+    {
+        "name": "baseline_minimal_intersection",
+        "description": "Minimal intersection baseline: expand only the smallest team, no grouping",
+        "builder": manual_baseline_minimal_intersection,
     },
     {
         "name": "current_handcrafted",
@@ -193,19 +234,14 @@ VARIANTS = [
         "builder": manual_current_handcrafted,
     },
     {
-        "name": "overhead_aware",
-        "description": "Avoid unnecessary expansion and only group when many leaves are touched",
-        "builder": manual_overhead_aware,
+        "name": "expand_all_unbounded",
+        "description": "Aggressive optimizer: expand every team without grouping",
+        "builder": manual_expand_all_unbounded,
     },
     {
-        "name": "imbalance_aware",
-        "description": "Prioritize very small teams and stay conservative on strongly imbalanced queries",
-        "builder": manual_imbalance_aware,
-    },
-    {
-        "name": "leaf_count_aware",
-        "description": "Prioritize teams with fewer touched leaves before applying expansion and grouping",
-        "builder": manual_leaf_count_aware,
+        "name": "expand_all_adaptive_grouping",
+        "description": "Expand every team and dynamically group large/unselective teams",
+        "builder": manual_expand_all_adaptive_grouping,
     },
 ]
 
@@ -403,7 +439,7 @@ def plot_runtime_comparison(df: pd.DataFrame, figure_path: Path):
 
 def plot_speedup_vs_baseline(df: pd.DataFrame, figure_path: Path):
     baseline = (
-        df[df["variant"] == "baseline_naive"][["query_name", "executor_runtime_ms"]]
+        df[df["variant"] == MAIN_BASELINE_VARIANT][["query_name", "executor_runtime_ms"]]
         .rename(columns={"executor_runtime_ms": "baseline_runtime_ms"})
     )
     merged = df.merge(baseline, on="query_name", how="left")
@@ -412,9 +448,9 @@ def plot_speedup_vs_baseline(df: pd.DataFrame, figure_path: Path):
 
     pivot = merged.pivot(index="query_name", columns="variant", values="speedup_vs_baseline")
     ax = pivot.plot(kind="bar", figsize=(12, 6))
-    ax.set_ylabel("Speedup vs baseline_naive")
+    ax.set_ylabel(f"Speedup vs {MAIN_BASELINE_VARIANT}")
     ax.set_xlabel("Query")
-    ax.set_title("Speedup Relative to the Naive Baseline")
+    ax.set_title("Speedup Relative to the Main Baseline")
     ax.axhline(1.0, color="black", linestyle="--", linewidth=1.0)
     ax.grid(axis="y", linestyle="--", linewidth=0.5)
     plt.tight_layout()
@@ -507,7 +543,6 @@ def main():
                     "missing_true_hits": len(ref - result_ids) if ref is not None else None,
                     "extra_hits": len(result_ids - ref) if ref is not None else None,
                     "executor_runtime_ms": runtime_stats.executor_runtime / 1_000_000,
-                    "plan_runtime_ms": runtime_stats.plan_construction_runtime / 1_000_000,
                     "total_request_count": global_info["total_request_count"],
                     "total_input_cardinality": global_info["total_input_cardinality"],
                     "total_read_volume_KiB": global_info["total_read_volume_KiB"],
@@ -546,12 +581,15 @@ def main():
     results_df = pd.DataFrame(result_rows)
     mopts_df = pd.DataFrame(mopts_rows)
 
-    baseline_df = results_df[results_df["variant"] == "baseline_naive"][
+    baseline_df = results_df[results_df["variant"] == MAIN_BASELINE_VARIANT][
         ["query_name", "executor_runtime_ms"]
     ].rename(columns={"executor_runtime_ms": "baseline_runtime_ms"})
     comparison_df = results_df.merge(baseline_df, on="query_name", how="left")
     comparison_df["speedup_vs_baseline"] = (
         comparison_df["baseline_runtime_ms"] / comparison_df["executor_runtime_ms"]
+    )
+    comparison_df["relative_runtime_vs_baseline"] = (
+        comparison_df["executor_runtime_ms"] / comparison_df["baseline_runtime_ms"]
     )
 
     results_csv = OUT_DIR / "results.csv"
