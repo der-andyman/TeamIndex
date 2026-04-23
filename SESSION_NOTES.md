@@ -17,13 +17,17 @@
 
 - Es gibt ein neues Skript: [mopts_study.py](/home/duman/TeamIndex/minimal_example/mopts_study.py)
 - Varianten aktuell:
-  - `baseline_naive`
+  - `baseline_union_first`
+  - `baseline_minimal_intersection`
   - `current_handcrafted`
-  - `overhead_aware`
-  - `imbalance_aware`
-  - `leaf_count_aware`
+  - `expand_all_unbounded`
+  - `expand_all_adaptive_grouping`
 - Ziel:
-  - saubere, naive Baseline
+  - `baseline_union_first` als einfache theoretische Referenz ohne Expansion
+  - `baseline_minimal_intersection` als Hauptbaseline mit genau einem expandierten Team
+  - `current_handcrafted` als bestehende handgeschriebene Heuristik aus `run_example.py`
+  - `expand_all_unbounded` als aggressiver Extremfall ohne Gruppierung
+  - `expand_all_adaptive_grouping` als dynamische Variante: alle Teams expandieren, aber grosse/unselektive Teams bei hoher ISE-Komplexitaet staerker gruppieren
   - Vergleich von Laufzeit, Trefferzahl, `missing_true_hits`, `extra_hits`
   - Export für `teamindexstandalone`
   - `execution plans` / `taskflow`-Artefakte / CSV-Auswertung
@@ -44,6 +48,7 @@
   - `sum_union_cardinality`
   - `imbalance_union_cardinality`
   - `query_domain`
+- `plan_runtime_ms` wird nicht mehr in den Haupt-CSVs getrackt, weil die Python-Planungszeit fuer die aktuelle Fragestellung bewusst ignoriert wird.
 - Standalone-Pläne:
   - [plans](/home/duman/TeamIndex/minimal_example/mopts_study/plans)
 - Graph-Artefakte:
@@ -76,6 +81,15 @@
 ## 8. Letzter realer Lauf
 
 - Am `2026-04-16` wurde [mopts_study.py](/home/duman/TeamIndex/minimal_example/mopts_study.py) erfolgreich mit den fünf Varianten durchgelaufen.
+- Am `2026-04-23` wurden die Varianten konzeptionell umgebaut:
+  - `baseline_union_first`
+  - `baseline_minimal_intersection`
+  - `current_handcrafted`
+  - `expand_all_unbounded`
+  - `expand_all_adaptive_grouping`
+- Die neuen Builder wurden gegen die vorhandenen Beispielqueries getestet und erzeugen gueltige `mopts`.
+- Ein kompletter Lauf mit den umgebauten Varianten wurde mit `--no-reference` erfolgreich ausgefuehrt.
+- Die lokale Ergebnisnotiz liegt in [MOPTS_STRATEGY_RESULT_NOTES.md](/home/duman/TeamIndex/MOPTS_STRATEGY_RESULT_NOTES.md) und wird per `.gitignore` nicht committed.
 - Erzeugt wurden:
   - [results.csv](/home/duman/TeamIndex/minimal_example/mopts_study/results.csv)
   - [comparison_vs_baseline.csv](/home/duman/TeamIndex/minimal_example/mopts_study/comparison_vs_baseline.csv)
