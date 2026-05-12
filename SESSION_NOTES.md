@@ -68,8 +68,10 @@
   - [graphs](/home/duman/TeamIndex/minimal_example/mopts_study/graphs)
   - dort liegen `*execution_plan-*.dot` und `*task_graph.json`
 - Plot-PDFs:
-  - [runtime_comparison.pdf](/home/duman/TeamIndex/minimal_example/mopts_study/plots/runtime_comparison.pdf)
-  - [speedup_vs_baseline.pdf](/home/duman/TeamIndex/minimal_example/mopts_study/plots/speedup_vs_baseline.pdf)
+  - [runtime_comparison.pdf](/home/duman/TeamIndex/minimal_example/mopts_study/runtime_comparison.pdf)
+  - [speedup_vs_baseline_runtime.pdf](/home/duman/TeamIndex/minimal_example/mopts_study/speedup_vs_baseline_runtime.pdf)
+  - [speedup_vs_baseline_ids_per_second.pdf](/home/duman/TeamIndex/minimal_example/mopts_study/speedup_vs_baseline_ids_per_second.pdf)
+  - [speedup_vs_baseline_mib_per_second.pdf](/home/duman/TeamIndex/minimal_example/mopts_study/speedup_vs_baseline_mib_per_second.pdf)
 
 ## 5. Wichtige Fixes in mopts_study / evaluation
 
@@ -83,11 +85,17 @@
   - `--verbose-runtime`
   - `--query-filter`
   - `--skip-dangerous`
+  - `--plots-only`
 - es gibt eingebaute Stress-Warnungen fuer:
   - sehr viele relevante Blaetter
   - sehr hohe geschaetzte ISE Counts
   - grosse expandierte Gesamtvolumina
 - `expand_all_unbounded` wurde wieder entfernt, weil die Strategie fuer breite Queries zu gefaehrlich und methodisch wenig nuetzlich war
+- neue Artefakt-Logik in [mopts_study.py](/home/duman/TeamIndex/minimal_example/mopts_study.py):
+  - vor jedem neuen Lauf werden alte Dateien in datumsbenannte Unterordner archiviert
+  - `plans/`, `graphs/`, `stats/` und `plots/` bekommen je einen Unterordner wie `12-05-2026_14-03`
+  - die CSVs und Summary-PDFs werden gesammelt unter `mopts_study/archives/<zeitstempel>/` wegarchiviert
+- die zwei Summary-PDFs liegen nicht mehr in `plots/`, sondern direkt neben den CSVs im Hauptordner `mopts_study/`
 
 ## 6. Aktueller Blocker
 

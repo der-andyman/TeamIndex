@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from datetime import datetime
 import json
 import math
 import shutil
@@ -241,6 +242,8 @@ def manual_dynamic_selective_expansion(index: eva.TeamIndex, query: str):
     candidate_infos = []
 
     for pos, (team_name, opt) in enumerate(mopts):
+        if not bool(opt.get("is_included", True)):
+            continue
         dims = index.cardinalities[team_name].shape
         slices = slices_dict[team_name]
         selected_bins_per_attribute = [
@@ -280,9 +283,9 @@ def manual_dynamic_selective_expansion(index: eva.TeamIndex, query: str):
 
     # Sehr kleine oder geometrisch triviale Plaene profitieren selten von
     # fruehen Team-Intersections.
-    if total_leaf_hits <= max(6, team_count + 2):
+    if total_leaf_hits < max(6, team_count + 2):
         return mopts
-    if total_selected_bin_cells <= max(8, team_count * 2):
+    if total_selected_bin_cells < max(8, team_count * 2):
         return mopts
 
     # Nur Queries mit genug Arbeitspotenzial sollten ueberhaupt expandieren.
@@ -413,6 +416,42 @@ def ensure_dirs():
         sub.mkdir(parents=True, exist_ok=True)
 
 
+def archive_previous_outputs():
+    run_stamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
+    moved_anything = False
+
+    for subdir_name in ["plans", "graphs", "stats", "plots"]:
+        subdir = OUT_DIR / subdir_name
+        archive_dir = subdir / run_stamp
+        files_to_move = [path for path in subdir.iterdir() if path.is_file()]
+        if not files_to_move:
+            continue
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        for path in files_to_move:
+            shutil.move(str(path), str(archive_dir / path.name))
+        moved_anything = True
+
+    summary_archive_dir = OUT_DIR / "archives" / run_stamp
+    summary_files = [
+        OUT_DIR / "results.csv",
+        OUT_DIR / "mopts_per_team.csv",
+        OUT_DIR / "comparison_vs_baseline.csv",
+        OUT_DIR / "runtime_comparison.pdf",
+        OUT_DIR / "speedup_vs_baseline.pdf",
+        OUT_DIR / "speedup_vs_baseline_runtime.pdf",
+        OUT_DIR / "speedup_vs_baseline_ids_per_second.pdf",
+        OUT_DIR / "speedup_vs_baseline_mib_per_second.pdf",
+    ]
+    existing_summary_files = [path for path in summary_files if path.exists()]
+    if existing_summary_files:
+        summary_archive_dir.mkdir(parents=True, exist_ok=True)
+        for path in existing_summary_files:
+            shutil.move(str(path), str(summary_archive_dir / path.name))
+        moved_anything = True
+
+    return run_stamp if moved_anything else None
+
+
 def latest_artifact(base_path: Path) -> Path | None:
     pattern = f"{base_path.stem}-*{base_path.suffix}"
     matches = sorted(base_path.parent.glob(pattern))
@@ -444,6 +483,11 @@ def parse_args():
         "--convert-only",
         action="store_true",
         help="Only convert existing execution_plan DOT files to PDFs.",
+    )
+    parser.add_argument(
+        "--plots-only",
+        action="store_true",
+        help="Only regenerate summary plots from the existing results.csv without running benchmarks.",
     )
     parser.add_argument(
         "--no-reference",
@@ -515,6 +559,10 @@ def _slice_len(slc, dim_size):
         return len(range(start, stop, step))
     if isinstance(slc, int):
         return 1
+    if hasattr(slc, "dtype") and hasattr(slc, "shape"):
+        if getattr(slc, "dtype", None) == bool:
+            return int(slc.sum())
+        return int(len(slc))
     raise TypeError(f"Unsupported slicer type: {type(slc)!r}")
 
 
@@ -722,12 +770,97 @@ def plot_speedup_vs_baseline(df: pd.DataFrame, figure_path: Path):
     plt.close()
 
 
+def plot_metric_ratio_vs_baseline(
+    df: pd.DataFrame,
+    metric_column: str,
+    baseline_metric_column: str,
+    figure_path: Path,
+    ylabel: str,
+    title: str,
+):
+    baseline = (
+        df[df["variant"] == MAIN_BASELINE_VARIANT][["query_name", metric_column]]
+        .rename(columns={metric_column: baseline_metric_column})
+    )
+    merged = df.merge(baseline, on="query_name", how="left")
+    merged = merged[merged[baseline_metric_column].notna()].copy()
+    merged["ratio_vs_baseline"] = merged[metric_column] / merged[baseline_metric_column]
+
+    pivot = merged.pivot(index="query_name", columns="variant", values="ratio_vs_baseline")
+    ax = pivot.plot(kind="bar", figsize=(12, 6))
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel("Query")
+    ax.set_title(title)
+    ax.axhline(1.0, color="black", linestyle="--", linewidth=1.0)
+    ax.grid(axis="y", linestyle="--", linewidth=0.5)
+    plt.tight_layout()
+    plt.savefig(figure_path)
+    plt.close()
+
+
+def generate_all_summary_plots(results_df: pd.DataFrame):
+    runtime_pdf = OUT_DIR / "runtime_comparison.pdf"
+    speedup_runtime_pdf = OUT_DIR / "speedup_vs_baseline_runtime.pdf"
+    speedup_ids_pdf = OUT_DIR / "speedup_vs_baseline_ids_per_second.pdf"
+    speedup_mib_pdf = OUT_DIR / "speedup_vs_baseline_mib_per_second.pdf"
+
+    plot_runtime_comparison(results_df, runtime_pdf)
+    plot_speedup_vs_baseline(results_df, speedup_runtime_pdf)
+    plot_metric_ratio_vs_baseline(
+        results_df,
+        metric_column="ids_per_second",
+        baseline_metric_column="baseline_ids_per_second",
+        figure_path=speedup_ids_pdf,
+        ylabel=f"IDs/s relative to {MAIN_BASELINE_VARIANT}",
+        title="IDs per Second Relative to the Main Baseline",
+    )
+    plot_metric_ratio_vs_baseline(
+        results_df,
+        metric_column="read_mib_per_second",
+        baseline_metric_column="baseline_read_mib_per_second",
+        figure_path=speedup_mib_pdf,
+        ylabel=f"MiB/s relative to {MAIN_BASELINE_VARIANT}",
+        title="Read MiB/s Relative to the Main Baseline",
+    )
+    return [
+        runtime_pdf,
+        speedup_runtime_pdf,
+        speedup_ids_pdf,
+        speedup_mib_pdf,
+    ]
+
+
+def write_current_outputs(result_rows, mopts_rows):
+    results_df = pd.DataFrame(result_rows)
+    mopts_df = pd.DataFrame(mopts_rows)
+
+    baseline_df = results_df[results_df["variant"] == MAIN_BASELINE_VARIANT][
+        ["query_name", "executor_runtime_ms"]
+    ].rename(columns={"executor_runtime_ms": "baseline_runtime_ms"})
+    comparison_df = results_df.merge(baseline_df, on="query_name", how="left")
+    comparison_df["speedup_vs_baseline"] = (
+        comparison_df["baseline_runtime_ms"] / comparison_df["executor_runtime_ms"]
+    )
+    comparison_df["relative_runtime_vs_baseline"] = (
+        comparison_df["executor_runtime_ms"] / comparison_df["baseline_runtime_ms"]
+    )
+
+    results_csv = OUT_DIR / "results.csv"
+    mopts_csv = OUT_DIR / "mopts_per_team.csv"
+    comparison_csv = OUT_DIR / "comparison_vs_baseline.csv"
+
+    results_df.to_csv(results_csv, index=False)
+    mopts_df.to_csv(mopts_csv, index=False)
+    comparison_df.to_csv(comparison_csv, index=False)
+    return results_df, mopts_df, comparison_df, results_csv, mopts_csv, comparison_csv
+
+
 def main():
     args = parse_args()
     ensure_dirs()
 
-    converted_plan_pdfs = convert_all_execution_plans()
     if args.convert_only:
+        converted_plan_pdfs = convert_all_execution_plans()
         if converted_plan_pdfs:
             print("Converted execution-plan PDFs:")
             for pdf_path in converted_plan_pdfs:
@@ -735,6 +868,21 @@ def main():
         else:
             print("No execution_plan DOT files found in graphs/.")
         return
+
+    if args.plots_only:
+        results_csv = OUT_DIR / "results.csv"
+        if not results_csv.exists():
+            raise RuntimeError(f"Missing results file for --plots-only: {results_csv}")
+        results_df = pd.read_csv(results_csv)
+        plot_paths = generate_all_summary_plots(results_df)
+        print("Regenerated summary plots from existing results.csv:")
+        for plot_path in plot_paths:
+            print(plot_path)
+        return
+
+    archived_run_stamp = archive_previous_outputs()
+    if archived_run_stamp is not None:
+        print(f"Archived previous outputs under timestamp: {archived_run_stamp}")
 
     table = None if args.no_reference else pd.read_parquet(DATA_PATH)
     index = eva.TeamIndex(INDEX_CONFIG)
@@ -779,7 +927,7 @@ def main():
             stress_warning = estimate_runtime_stress(query_name, variant_name, query_structure)
             if stress_warning:
                 print(stress_warning)
-                if args.skip-dangerous:
+                if args.skip_dangerous:
                     print(f"Skipping {query_name}/{variant_name} because --skip-dangerous is active.")
                     continue
 
@@ -866,6 +1014,8 @@ def main():
                 )
             )
 
+            write_current_outputs(result_rows, mopts_rows)
+
             print(
                 f"{variant_name}: runtime={runtime_stats.executor_runtime / 1_000_000:.3f} ms, "
                 f"missing={(len(ref - result_ids) if ref is not None else 'n/a')}, "
@@ -873,30 +1023,12 @@ def main():
                 f"result={len(result_ids)}"
             )
 
-    results_df = pd.DataFrame(result_rows)
-    mopts_df = pd.DataFrame(mopts_rows)
-
-    baseline_df = results_df[results_df["variant"] == MAIN_BASELINE_VARIANT][
-        ["query_name", "executor_runtime_ms"]
-    ].rename(columns={"executor_runtime_ms": "baseline_runtime_ms"})
-    comparison_df = results_df.merge(baseline_df, on="query_name", how="left")
-    comparison_df["speedup_vs_baseline"] = (
-        comparison_df["baseline_runtime_ms"] / comparison_df["executor_runtime_ms"]
-    )
-    comparison_df["relative_runtime_vs_baseline"] = (
-        comparison_df["executor_runtime_ms"] / comparison_df["baseline_runtime_ms"]
+    results_df, mopts_df, comparison_df, results_csv, mopts_csv, comparison_csv = write_current_outputs(
+        result_rows,
+        mopts_rows,
     )
 
-    results_csv = OUT_DIR / "results.csv"
-    mopts_csv = OUT_DIR / "mopts_per_team.csv"
-    comparison_csv = OUT_DIR / "comparison_vs_baseline.csv"
-
-    results_df.to_csv(results_csv, index=False)
-    mopts_df.to_csv(mopts_csv, index=False)
-    comparison_df.to_csv(comparison_csv, index=False)
-
-    plot_runtime_comparison(results_df, OUT_DIR / "plots" / "runtime_comparison.pdf")
-    plot_speedup_vs_baseline(results_df, OUT_DIR / "plots" / "speedup_vs_baseline.pdf")
+    plot_paths = generate_all_summary_plots(results_df)
 
     converted_plan_pdfs = convert_all_execution_plans()
 
@@ -904,8 +1036,8 @@ def main():
     print(results_csv)
     print(mopts_csv)
     print(comparison_csv)
-    print(OUT_DIR / "plots" / "runtime_comparison.pdf")
-    print(OUT_DIR / "plots" / "speedup_vs_baseline.pdf")
+    for plot_path in plot_paths:
+        print(plot_path)
     if converted_plan_pdfs:
         print("\nExecution-plan PDFs:")
         for pdf_path in converted_plan_pdfs:
