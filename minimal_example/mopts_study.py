@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import json
 import math
 import shutil
 import subprocess
@@ -21,6 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent
 OUT_DIR = (BASE_DIR / "mopts_study").resolve()
 GENERATE_WORKER_PLOTS = False
 MAIN_BASELINE_VARIANT = "baseline_minimal_intersection"
+DANGEROUS_ISE_WARNING = 5_000
+DANGEROUS_VOLUME_IDS_WARNING = 1_000_000_000
+DANGEROUS_LEAF_WARNING = 100
 
 
 # A compact, explainable query set that covers:
@@ -29,6 +33,7 @@ MAIN_BASELINE_VARIANT = "baseline_minimal_intersection"
 # - mixed 3D/2D intersections
 # - two 2D teams together
 # - larger multi-team plans
+# - wider stress queries that touch many leaves and produce longer runtimes
 QUERIES = [
     ("q01_single_3d", "A < 19 and E < 19 and C < 19"),
     ("q02_single_2d", "B < 30 and I < 30"),
@@ -36,6 +41,9 @@ QUERIES = [
     ("q04_two_2d_teams", "B < 30 and I < 30 and F < 30 and H < 30"),
     ("q05_three_teams", "A < 38 and E < 38 and C < 19 and B < 38 and F < 40"),
     ("q06_two_3d_teams", "A < 20 and E < 20 and C < 20 and J < 20 and D < 20 and G < 20"),
+    ("q07_wide_2d_teams_75", "B < 75 and I < 75 and F < 75 and H < 75"),
+    ("q08_wide_3d_teams_75", "A < 75 and E < 75 and C < 75 and J < 75 and D < 75 and G < 75"),
+    ("q09_mixed_big_result", "A < 75 and E < 75 and B < 75 and I < 75 and F < 75 and H < 75"),
 ]
 
 
@@ -127,29 +135,6 @@ def manual_current_handcrafted(index: eva.TeamIndex, query: str):
     return mopts
 
 
-def manual_expand_all_unbounded(index: eva.TeamIndex, query: str):
-    # Optimizer: Expand All Unbounded
-    # --------------------------------
-    # Was passiert?
-    # - expandiere jedes beteiligte Team
-    # - keine Gruppierung
-    #
-    # Idee:
-    # Dies ist der aggressive Gegenpol zu Union First. Alle getroffenen
-    # Team-Blaetter/Gruppen werden so frueh wie moeglich in Intersections
-    # hineingezogen.
-    #
-    # Erwartung:
-    # Diese Strategie kann stark profitieren, wenn fruehe Intersections
-    # sehr selektiv sind. Sie kann aber auch massiv schaden, weil der
-    # ISE Count als Produkt aller group_count-Werte explodieren kann.
-    mopts = clone_mopts(index.prepare_optimization(query=query))
-    for _, opt in mopts:
-        opt["is_expanded"] = True
-
-    return mopts
-
-
 def manual_expand_all_adaptive_grouping(index: eva.TeamIndex, query: str):
     # Optimizer: Expand All Adaptive Grouping
     # ---------------------------------------
@@ -177,7 +162,10 @@ def manual_expand_all_adaptive_grouping(index: eva.TeamIndex, query: str):
     for _, opt in mopts:
         opt["is_expanded"] = True
 
-    max_group_counts = [max(1, int(opt["max_group_count"])) for _, opt in mopts]
+    # Use the currently feasible group_count as upper bound. For excluded
+    # Teams, prepare_optimization may switch to the complement selection,
+    # which can have fewer usable leaves than max_group_count suggests.
+    max_group_counts = [max(1, int(opt["group_count"])) for _, opt in mopts]
     raw_ise_count = product(max_group_counts)
     team_count = len(mopts)
 
@@ -197,7 +185,7 @@ def manual_expand_all_adaptive_grouping(index: eva.TeamIndex, query: str):
     alpha = max(0.35, min(0.90, 1.0 / raw_ise_factor))
 
     for _, opt in mopts:
-        max_groups = max(1, int(opt["max_group_count"]))
+        max_groups = max(1, int(opt["group_count"]))
         if max_groups <= 2:
             continue
 
@@ -212,6 +200,174 @@ def manual_expand_all_adaptive_grouping(index: eva.TeamIndex, query: str):
 
         grouped_count = int(round(max_groups ** team_alpha))
         grouped_count = max(1, min(grouped_count, max_groups - 1))
+        opt["group_count"] = grouped_count
+
+    return mopts
+
+
+def manual_dynamic_selective_expansion(index: eva.TeamIndex, query: str):
+    # Optimizer: Dynamic Selective Expansion
+    # --------------------------------------
+    # Was passiert?
+    # - analysiere zuerst die Form der aktuellen Query
+    # - beruecksichtige Teams, relevante Blaetter, gewaehlte Bins und
+    #   Team-Volumina gemeinsam
+    # - expandiere nicht blind, sondern nur Teams mit guenstigem
+    #   Kosten-/Nutzen-Profil
+    # - gruppiere expandierte Teams nur dann moderat, wenn die resultierende
+    #   ISE Count fuer die aktuelle Query-Form sonst zu stark anwachsen wuerde
+    #
+    # Idee:
+    # Diese Strategie soll nicht mehr einem festen Startpunkt wie
+    # "Union First" oder "Expand First" folgen. Stattdessen versucht sie,
+    # aus der Query-Struktur selbst abzuleiten, ob fruehe Intersections
+    # ueberhaupt lohnend erscheinen. Kleine Single-Team- oder Low-Leaf-Queries
+    # bleiben deshalb implizit bei einer union-nahen Ausfuehrung, waehrend
+    # multi-teamige, strukturreichere Queries gezielt Expansion erhalten.
+    mopts = clone_mopts(index.prepare_optimization(query=query))
+    if not mopts:
+        return mopts
+
+    team_count = len(mopts)
+    if team_count <= 1:
+        return mopts
+
+    slices_dict = index.query_to_slices(query, optimizations=mopts)
+    total_leaf_hits = sum(int(opt["max_group_count"]) for _, opt in mopts)
+    total_union_card = sum(int(opt["union_cardinality"]) for _, opt in mopts)
+    min_union_card = min(max(1, int(opt["union_cardinality"])) for _, opt in mopts)
+    worker_budget = max(1, int(index.default_runtime_config.get("worker_count", 1)))
+    total_selected_bin_cells = 0
+    candidate_infos = []
+
+    for pos, (team_name, opt) in enumerate(mopts):
+        dims = index.cardinalities[team_name].shape
+        slices = slices_dict[team_name]
+        selected_bins_per_attribute = [
+            _slice_len(slc, dim)
+            for slc, dim in zip(slices, dims)
+        ]
+        selected_bin_cells = product(selected_bins_per_attribute)
+        total_selected_bin_cells += selected_bin_cells
+
+        feasible_groups = max(1, int(opt["group_count"]))
+        union_card = max(1, int(opt["union_cardinality"]))
+        relative_size = union_card / min_union_card
+        avg_ids_per_leaf = union_card / feasible_groups
+
+        # Hoher Score bedeutet:
+        # - wenige Blaetter / ISE-gunstig
+        # - kleines Team / hohe potenzielle Filterwirkung
+        # - feine Bin-Ausdehnung statt extrem breiter geometrischer Query
+        leaf_score = 1.0 / feasible_groups
+        size_score = 1.0 / relative_size
+        geometry_score = 1.0 / max(1.0, math.sqrt(selected_bin_cells))
+        density_penalty = max(1.0, math.log10(max(avg_ids_per_leaf, 10)))
+        expansion_score = (leaf_score * size_score * geometry_score) / density_penalty
+
+        candidate_infos.append(
+            {
+                "pos": pos,
+                "team_name": team_name,
+                "feasible_groups": feasible_groups,
+                "union_cardinality": union_card,
+                "relative_size": relative_size,
+                "selected_bin_cells": selected_bin_cells,
+                "selected_bins_per_attribute": selected_bins_per_attribute,
+                "expansion_score": expansion_score,
+            }
+        )
+
+    # Sehr kleine oder geometrisch triviale Plaene profitieren selten von
+    # fruehen Team-Intersections.
+    if total_leaf_hits <= max(6, team_count + 2):
+        return mopts
+    if total_selected_bin_cells <= max(8, team_count * 2):
+        return mopts
+
+    # Nur Queries mit genug Arbeitspotenzial sollten ueberhaupt expandieren.
+    query_large_enough = (
+        total_union_card >= 50_000_000
+        or total_leaf_hits >= 12
+        or total_selected_bin_cells >= 24
+    )
+    if not query_large_enough:
+        return mopts
+
+    candidate_infos = sorted(
+        candidate_infos,
+        key=lambda item: (
+            -item["expansion_score"],
+            item["relative_size"],
+            item["feasible_groups"],
+        ),
+    )
+
+    selected_positions = []
+    current_ise = 1
+    ise_budget = max(worker_budget * 3, 24)
+
+    for info in candidate_infos:
+        # Gute Expansionskandidaten sollen
+        # - nicht riesig sein
+        # - nicht zu viele Blaetter haben
+        # - geometrisch nicht zu breit sein
+        good_local_shape = (
+            info["relative_size"] <= 6.0
+            and info["feasible_groups"] <= max(16, worker_budget)
+            and info["selected_bin_cells"] <= max(64, worker_budget * 2)
+        )
+        if not good_local_shape:
+            continue
+
+        # Gleichzeitig muss der Team-Score hoch genug sein, damit wir nicht
+        # aus Prinzip expandieren.
+        if info["expansion_score"] < 0.003:
+            continue
+
+        projected_ise = current_ise * info["feasible_groups"]
+        if projected_ise > ise_budget:
+            continue
+
+        selected_positions.append(info["pos"])
+        current_ise = projected_ise
+
+        # Nicht alle Teams expandieren: wir stoppen spaetestens nach zwei
+        # Teams oder wenn die ISE Count schon einen sinnvollen Arbeitsvorrat
+        # fuer die Threads erzeugt.
+        if len(selected_positions) >= 2:
+            break
+        if current_ise >= worker_budget:
+            break
+
+    # Wenn kein Team ein gutes Profil hat, bleibt die Query implizit bei einer
+    # union-nahen Ausfuehrung.
+    if not selected_positions:
+        return mopts
+
+    for pos in selected_positions:
+        _, opt = mopts[pos]
+        opt["is_expanded"] = True
+
+    # Nur expandierte Teams werden gegebenenfalls gruppiert.
+    # Kleine ISE-Werte bleiben unberuehrt, groessere werden moderat gedaempft.
+    for pos in selected_positions:
+        _, opt = mopts[pos]
+        max_groups = max(1, int(opt["group_count"]))
+        if max_groups <= 2:
+            continue
+
+        union_card = max(1, int(opt["union_cardinality"]))
+        relative_size = union_card / min_union_card
+
+        # Je groesser die aktuelle ISE Count und je groesser das Team,
+        # desto staerker gruppieren wir.
+        alpha = 0.85 if current_ise <= worker_budget else 0.70
+        alpha /= min(1.5, relative_size ** 0.10)
+        alpha = max(0.45, min(0.95, alpha))
+
+        grouped_count = int(round(max_groups ** alpha))
+        grouped_count = max(1, min(grouped_count, max_groups))
         opt["group_count"] = grouped_count
 
     return mopts
@@ -234,9 +390,9 @@ VARIANTS = [
         "builder": manual_current_handcrafted,
     },
     {
-        "name": "expand_all_unbounded",
-        "description": "Aggressive optimizer: expand every team without grouping",
-        "builder": manual_expand_all_unbounded,
+        "name": "dynamic_selective_expansion",
+        "description": "Start from union-first and expand only teams with favorable cost/benefit",
+        "builder": manual_dynamic_selective_expansion,
     },
     {
         "name": "expand_all_adaptive_grouping",
@@ -294,16 +450,47 @@ def parse_args():
         action="store_true",
         help="Skip loading the large parquet file and do not compute pandas-based correctness references.",
     )
+    parser.add_argument(
+        "--worker-count",
+        type=int,
+        default=None,
+        help="Override runtime worker_count. Useful for thread-scaling experiments.",
+    )
+    parser.add_argument(
+        "--queue-pair-count",
+        type=int,
+        default=None,
+        help="Override StorageConfig.queue_pair_count. Defaults to the library runtime default.",
+    )
+    parser.add_argument(
+        "--verbose-runtime",
+        action="store_true",
+        help="Enable verbose runtime output from TeamIndex.",
+    )
+    parser.add_argument(
+        "--query-filter",
+        action="append",
+        default=[],
+        help="Only run queries whose name contains the given substring. Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--skip-dangerous",
+        action="store_true",
+        help="Skip variants that trigger the built-in stress warnings for very large ISE/volume combinations.",
+    )
     return parser.parse_args()
 
 
-def build_runtime_config(experiment_name: str):
+def build_runtime_config(experiment_name: str, args):
     config = eva.get_new_default_runtime_config()
     config["backend"] = "dram"
-    config["verbose_runtime"] = False
+    config["verbose_runtime"] = args.verbose_runtime
     config["return_result"] = True
-    config["StorageConfig"]["queue_pair_count"] = 3
     config["experiment_name"] = experiment_name
+    if args.worker_count is not None:
+        config["worker_count"] = args.worker_count
+    if args.queue_pair_count is not None:
+        config["StorageConfig"]["queue_pair_count"] = args.queue_pair_count
 
     graph_base = (OUT_DIR / "graphs" / f"{experiment_name}-execution_plan.dot").resolve()
     task_stats_base = (OUT_DIR / "stats" / f"task_stats-{experiment_name}.json").resolve()
@@ -322,13 +509,58 @@ def save_worker_plot(task_stats_path: Path, figure_path: Path):
     tib.plot_worker_tasks(task_data, figure_path)
 
 
-def summarize_mopts(query_id, query_name, query, variant_name, mopts, request_info):
+def _slice_len(slc, dim_size):
+    if isinstance(slc, slice):
+        start, stop, step = slc.indices(dim_size)
+        return len(range(start, stop, step))
+    if isinstance(slc, int):
+        return 1
+    raise TypeError(f"Unsupported slicer type: {type(slc)!r}")
+
+
+def summarize_bin_selection(index: eva.TeamIndex, query: str, mopts):
+    if not mopts:
+        return {}, {
+            "total_selected_bin_cells": 0,
+            "total_selected_attribute_bins": 0,
+        }
+
+    slices_dict = index.query_to_slices(query, optimizations=mopts)
+    per_team = {}
+    total_selected_bin_cells = 0
+    total_selected_attribute_bins = 0
+
+    for team_name, opts in mopts:
+        dims = index.cardinalities[team_name].shape
+        attributes = index.teams[team_name]
+        slices = slices_dict[team_name]
+        per_attr = {
+            attr: _slice_len(slc, dim)
+            for attr, slc, dim in zip(attributes, slices, dims)
+        }
+        selected_bin_cells = product(per_attr.values())
+        total_selected_bin_cells += selected_bin_cells
+        total_selected_attribute_bins += sum(per_attr.values())
+        per_team[team_name] = {
+            "team_dimension_count": len(attributes),
+            "selected_bin_count_product": selected_bin_cells,
+            "selected_bin_counts_per_attribute": per_attr,
+        }
+
+    return per_team, {
+        "total_selected_bin_cells": total_selected_bin_cells,
+        "total_selected_attribute_bins": total_selected_attribute_bins,
+    }
+
+
+def summarize_mopts(query_id, query_name, query, variant_name, mopts, request_info, bin_info_by_team):
     rows = []
     if mopts is None:
         return rows
 
     for team_name, opts in mopts:
         team_request_info = request_info.get(team_name, {})
+        team_bin_info = bin_info_by_team.get(team_name, {})
         rows.append(
             {
                 "query_id": query_id,
@@ -342,6 +574,12 @@ def summarize_mopts(query_id, query_name, query, variant_name, mopts, request_in
                 "is_expanded": opts.get("is_expanded"),
                 "group_count": opts.get("group_count"),
                 "max_group_count": opts.get("max_group_count"),
+                "team_dimension_count": team_bin_info.get("team_dimension_count"),
+                "selected_bin_count_product": team_bin_info.get("selected_bin_count_product"),
+                "selected_bin_counts_per_attribute": json.dumps(
+                    team_bin_info.get("selected_bin_counts_per_attribute", {}),
+                    sort_keys=True,
+                ),
                 "netto_data_volume_KiB": opts.get("netto_data_volume_KiB"),
                 "io_volume_KiB": opts.get("io_volume_KiB"),
                 "request_count": team_request_info.get("request_count"),
@@ -425,6 +663,32 @@ def summarize_query_structure(mopts):
     }
 
 
+def estimate_runtime_stress(query_name, variant_name, query_structure):
+    warnings = []
+    if query_structure["team_count"] >= 2 and query_structure["sum_max_group_count"] >= DANGEROUS_LEAF_WARNING:
+        warnings.append(
+            f"many leaves selected ({query_structure['sum_max_group_count']})"
+        )
+    if query_structure["ise_count_estimate_manual"] >= DANGEROUS_ISE_WARNING:
+        warnings.append(
+            f"high estimated ISE count ({query_structure['ise_count_estimate_manual']})"
+        )
+    if (
+        query_structure["expanded_team_count_manual"] >= 2
+        and query_structure["sum_union_cardinality"] >= DANGEROUS_VOLUME_IDS_WARNING
+        and query_structure["sum_max_group_count"] >= DANGEROUS_LEAF_WARNING
+    ):
+        warnings.append(
+            f"large expanded volume ({query_structure['sum_union_cardinality']} ids over all teams)"
+        )
+    if warnings:
+        return (
+            f"WARNING {query_name}/{variant_name}: "
+            + "; ".join(warnings)
+        )
+    return None
+
+
 def plot_runtime_comparison(df: pd.DataFrame, figure_path: Path):
     pivot = df.pivot(index="query_name", columns="variant", values="executor_runtime_ms")
     ax = pivot.plot(kind="bar", figsize=(12, 6))
@@ -474,11 +738,18 @@ def main():
 
     table = None if args.no_reference else pd.read_parquet(DATA_PATH)
     index = eva.TeamIndex(INDEX_CONFIG)
+    selected_queries = [
+        item for item in QUERIES
+        if not args.query_filter
+        or any(pattern in item[0] for pattern in args.query_filter)
+    ]
+    if not selected_queries:
+        raise RuntimeError("No queries matched --query-filter.")
 
     result_rows = []
     mopts_rows = []
 
-    for query_id, (query_name, query) in enumerate(QUERIES, start=1):
+    for query_id, (query_name, query) in enumerate(selected_queries, start=1):
         ref = set(table.query(query).index) if table is not None else None
         print(f"\n=== {query_name} ===")
         print(query)
@@ -490,7 +761,7 @@ def main():
         for variant in VARIANTS:
             variant_name = variant["name"]
             experiment_name = f"{query_name}-{variant_name}"
-            config, graph_base, task_stats_base, result_stats_base, task_graph_base = build_runtime_config(experiment_name)
+            config, graph_base, task_stats_base, result_stats_base, task_graph_base = build_runtime_config(experiment_name, args)
 
             if variant["builder"] is None:
                 manual_mopts = None
@@ -500,6 +771,17 @@ def main():
                 executed_mopts = clone_mopts(manual_mopts)
 
             query_structure = summarize_query_structure(executed_mopts)
+            query_structure["ise_count_estimate_manual"] = product(
+                [int(opts["group_count"]) for _, opts in executed_mopts if opts["is_expanded"]]
+            ) if query_structure["expanded_team_count_manual"] > 0 else 0
+            bin_info_by_team, bin_summary = summarize_bin_selection(index, query, executed_mopts)
+            query_structure.update(bin_summary)
+            stress_warning = estimate_runtime_stress(query_name, variant_name, query_structure)
+            if stress_warning:
+                print(stress_warning)
+                if args.skip-dangerous:
+                    print(f"Skipping {query_name}/{variant_name} because --skip-dangerous is active.")
+                    continue
 
             result_ids, runtime_stats, request_info, global_info = index.run_query(
                 query,
@@ -543,10 +825,22 @@ def main():
                     "missing_true_hits": len(ref - result_ids) if ref is not None else None,
                     "extra_hits": len(result_ids - ref) if ref is not None else None,
                     "executor_runtime_ms": runtime_stats.executor_runtime / 1_000_000,
+                    "worker_count": config["worker_count"],
+                    "queue_pair_count": config["StorageConfig"]["queue_pair_count"],
                     "total_request_count": global_info["total_request_count"],
                     "total_input_cardinality": global_info["total_input_cardinality"],
                     "total_read_volume_KiB": global_info["total_read_volume_KiB"],
                     "total_compressed_size_KB": global_info["total_compressed_size_KB"],
+                    "ids_per_second": (
+                        global_info["total_input_cardinality"] / (runtime_stats.executor_runtime / 1_000_000_000)
+                    ),
+                    "million_ids_per_second": (
+                        global_info["total_input_cardinality"] / (runtime_stats.executor_runtime / 1_000_000_000) / 1_000_000
+                    ),
+                    "read_mib_per_second": (
+                        (global_info["total_read_volume_KiB"] / 1024)
+                        / (runtime_stats.executor_runtime / 1_000_000_000)
+                    ),
                     "ise_count": global_info["ise_count"],
                     "outer_union_term_count": global_info["outer_union_term_count"],
                     "outer_intersection_term_count": global_info["outer_intersection_term_count"],
@@ -568,6 +862,7 @@ def main():
                     variant_name=variant_name,
                     mopts=executed_mopts,
                     request_info=request_info,
+                    bin_info_by_team=bin_info_by_team,
                 )
             )
 

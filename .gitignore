@@ -28,6 +28,7 @@ minimal_example/__pycache__/
 
 # Ignore generated local scratch config
 minimal_example/toy_index_scratch.json
+minimal_example/toy_index_local.json
 
 # Ignore generated benchmark/study CSV artifacts
 minimal_example/*.csv

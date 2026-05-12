@@ -20,13 +20,13 @@
   - `baseline_union_first`
   - `baseline_minimal_intersection`
   - `current_handcrafted`
-  - `expand_all_unbounded`
+  - `dynamic_selective_expansion`
   - `expand_all_adaptive_grouping`
 - Ziel:
   - `baseline_union_first` als einfache theoretische Referenz ohne Expansion
   - `baseline_minimal_intersection` als Hauptbaseline mit genau einem expandierten Team
   - `current_handcrafted` als bestehende handgeschriebene Heuristik aus `run_example.py`
-  - `expand_all_unbounded` als aggressiver Extremfall ohne Gruppierung
+  - `dynamic_selective_expansion` als neue query-form-basierte Variante: erst Query-Struktur analysieren, dann nur guenstige Teams selektiv expandieren
   - `expand_all_adaptive_grouping` als dynamische Variante: alle Teams expandieren, aber grosse/unselektive Teams bei hoher ISE-Komplexitaet staerker gruppieren
   - Vergleich von Laufzeit, Trefferzahl, `missing_true_hits`, `extra_hits`
   - Export für `teamindexstandalone`
@@ -48,6 +48,19 @@
   - `sum_union_cardinality`
   - `imbalance_union_cardinality`
   - `query_domain`
+- neue Laufzeit-/Skalierungsmetriken:
+  - `worker_count`
+  - `queue_pair_count`
+  - `ids_per_second`
+  - `million_ids_per_second`
+  - `read_mib_per_second`
+- neue Query-Strukturmetriken:
+  - `total_selected_bin_cells`
+  - `total_selected_attribute_bins`
+- in `mopts_per_team.csv` zusaetzlich:
+  - `team_dimension_count`
+  - `selected_bin_count_product`
+  - `selected_bin_counts_per_attribute`
 - `plan_runtime_ms` wird nicht mehr in den Haupt-CSVs getrackt, weil die Python-Planungszeit fuer die aktuelle Fragestellung bewusst ignoriert wird.
 - Standalone-Pläne:
   - [plans](/home/duman/TeamIndex/minimal_example/mopts_study/plans)
@@ -64,6 +77,17 @@
 - `dry_run`-Export in [evaluation.py](/home/duman/TeamIndex/code/python/TeamIndex/evaluation.py) wurde gegen `numpy.int64` / `numpy`-Skalare robuster gemacht
 - [mopts_study.py](/home/duman/TeamIndex/minimal_example/mopts_study.py) hat jetzt auch `--convert-only` für die PDF-Konvertierung vorhandener `execution_plan`-DOT-Dateien
 - [mopts_study.py](/home/duman/TeamIndex/minimal_example/mopts_study.py) hat jetzt auch `--no-reference`, damit der große Parquet-Datensatz nicht geladen werden muss, wenn nur Performance/Planstruktur untersucht werden soll
+- [mopts_study.py](/home/duman/TeamIndex/minimal_example/mopts_study.py) hat jetzt auch:
+  - `--worker-count`
+  - `--queue-pair-count`
+  - `--verbose-runtime`
+  - `--query-filter`
+  - `--skip-dangerous`
+- es gibt eingebaute Stress-Warnungen fuer:
+  - sehr viele relevante Blaetter
+  - sehr hohe geschaetzte ISE Counts
+  - grosse expandierte Gesamtvolumina
+- `expand_all_unbounded` wurde wieder entfernt, weil die Strategie fuer breite Queries zu gefaehrlich und methodisch wenig nuetzlich war
 
 ## 6. Aktueller Blocker
 
@@ -73,10 +97,12 @@
 
 ## 7. Nächste sinnvolle Schritte
 
-- `mopts`-Varianten auf großem Datensatz (`n = 1_000_000_000`) systematisch testen
+- Thread-Scaling fuer ausgewaehlte Queries (`worker_count` 4 / 8 / 16 / ...) systematisch vergleichen
+- `mopts`-Varianten auf großem Datensatz (`n = 1_000_000_000`) vorsichtig mit Warn-/Skip-Logik testen
 - Query-Sets / Schwierigkeit / Benchmark-Design für die Bachelorarbeit weiter schärfen
 - untersuchen, in welchen Query-Domänen Optimierer überhaupt relevant werden
 - Python- und Standalone-Messungen gezielt vergleichen
+- die neue `dynamic_selective_expansion` zuerst klein gegen `q01`, `q02`, `q03`, `q06` pruefen, bevor breite Stressqueries wieder voll durchlaufen
 
 ## 8. Letzter realer Lauf
 
@@ -85,7 +111,7 @@
   - `baseline_union_first`
   - `baseline_minimal_intersection`
   - `current_handcrafted`
-  - `expand_all_unbounded`
+  - `dynamic_selective_expansion`
   - `expand_all_adaptive_grouping`
 - Die neuen Builder wurden gegen die vorhandenen Beispielqueries getestet und erzeugen gueltige `mopts`.
 - Ein kompletter Lauf mit den umgebauten Varianten wurde mit `--no-reference` erfolgreich ausgefuehrt.
@@ -97,10 +123,24 @@
 - Erste Tendenz aus dem Lauf:
   - bei sehr kleinen Single-Team-Queries bringen Optimierer oft wenig oder verschlechtern leicht
   - bei unausgeglichenen Mehr-Team-Queries bringt `current_handcrafted` deutlich etwas
-  - bei manchen Zwei-3D-Team-Queries war `leaf_count_aware` sogar am schnellsten
-  - die Wirkung von Optimierern hängt also klar von Query-Struktur, Leaf-Hits und Team-Imbalance ab
+  - `expand_all_adaptive_grouping` half in einigen groesseren Mehr-Team-Faellen, war aber kein universeller Gewinner
+  - breite Queries wie `q07` bis `q09` koennen den Server stark belasten; deshalb wurden Warnungen und `--skip-dangerous` eingebaut
+  - die Wirkung von Optimierern hängt also klar von Query-Struktur, Leaf-Hits, Team-Imbalance und ISE-Komplexitaet ab
 
-## 9. ToDo für später
+## 9. Speicherort Index / Daten
+
+- Der grosse Parquet-Datensatz liegt weiterhin auf Scratch:
+  - `/media/scratch/duman/teamindex/uniform_toy_data.parquet`
+- Der eigentliche TeamIndex liegt jetzt wieder lokal auf der SSD im Projektordner:
+  - [minimal_example/index_data](/home/duman/TeamIndex/minimal_example/index_data)
+- [example_paths.py](/home/duman/TeamIndex/minimal_example/example_paths.py) wurde entsprechend vereinfacht:
+  - `INDEX_CONFIG` zeigt immer auf `toy_index_local.json`
+  - `INDEX_DATA_DIR` zeigt immer auf `minimal_example/index_data`
+  - kein Scratch-Fallback mehr fuer den Index
+- die lokale Konfigurationsdatei [toy_index_local.json](/home/duman/TeamIndex/minimal_example/toy_index_local.json) ist generiert und wird per `.gitignore` nicht committed
+- der zwischenzeitliche Scratch-Index wurde wieder geloescht, damit auf Scratch nur noch die grosse Parquet-Datei liegt
+
+## 10. ToDo für später
 
 - DRAM-Cache über mehrere Runs prüfen:
   - aktuell lädt der DRAM-Backend pro Run nur die query-relevanten Team-Dateien, aber bei wiederholten Läufen werden diese Teams erneut in den RAM geladen
