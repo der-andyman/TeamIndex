@@ -16,11 +16,11 @@ import pandas as pd
 
 from TeamIndex import benchmark as tib
 from TeamIndex import evaluation as eva
-from example_paths import DATA_PATH, INDEX_CONFIG
+from study_paths import DATA_PATH, INDEX_CONFIG
 
 
 BASE_DIR = Path(__file__).resolve().parent
-OUT_DIR = (BASE_DIR / "mopts_study").resolve()
+OUT_DIR = (BASE_DIR / "results").resolve()
 GENERATE_WORKER_PLOTS = False
 MAIN_BASELINE_VARIANT = "baseline_minimal_intersection"
 DANGEROUS_ISE_WARNING = 5_000
@@ -46,6 +46,44 @@ QUERIES = [
     ("q08_wide_3d_teams_75", "A < 75 and E < 75 and C < 75 and J < 75 and D < 75 and G < 75"),
     ("q09_mixed_big_result", "A < 75 and E < 75 and B < 75 and I < 75 and F < 75 and H < 75"),
 ]
+
+QUERY_PLOT_DESCRIPTIONS = {
+    "q01_single_3d": "q01: einzelnes 3D-Team, kleine Query",
+    "q02_single_2d": "q02: einzelnes 2D-Team, breite Ergebnisliste",
+    "q03_two_teams": "q03: 3D+2D, kleine Zwei-Team-Intersection",
+    "q04_two_2d_teams": "q04: zwei 2D-Teams, mittlere Intersection",
+    "q05_three_teams": "q05: drei Teams, groesseres Working Set",
+    "q06_two_3d_teams": "q06: zwei 3D-Teams, selektive Intersection",
+    "q07_wide_2d_teams_75": "q07: zwei breite 2D-Teams, sehr viele Treffer",
+    "q08_wide_3d_teams_75": "q08: zwei breite 3D-Teams, viele Blaetter",
+    "q09_mixed_big_result": "q09: gemischte breite Query, sehr grosses Ergebnis",
+}
+
+
+def build_query_tick_labels(query_names):
+    tick_labels = []
+    notes = []
+    for query_name in query_names:
+        short_label = query_name.split("_", 1)[0]
+        tick_labels.append(short_label)
+        notes.append(QUERY_PLOT_DESCRIPTIONS.get(query_name, f"{short_label}: {query_name}"))
+    return tick_labels, notes
+
+
+def add_query_notes(ax, query_names):
+    tick_labels, notes = build_query_tick_labels(list(query_names))
+    ax.set_xticklabels(tick_labels, rotation=0)
+    note_lines = ["   |   ".join(notes[i:i + 3]) for i in range(0, len(notes), 3)]
+    note_text = "\n".join(note_lines)
+    ax.figure.text(
+        0.5,
+        0.02,
+        note_text,
+        ha="center",
+        va="bottom",
+        fontsize=9,
+    )
+    return note_text
 
 
 def clone_mopts(mopts):
@@ -90,7 +128,7 @@ def manual_baseline_minimal_intersection(index: eva.TeamIndex, query: str):
     # Ein kleines Team wird in die Intersections hineingezogen, damit
     # Zwischenergebnisse frueher reduziert werden koennen. Gleichzeitig
     # bleibt die Strategie bewusst minimal und wird nicht zu einer Kopie
-    # der handgeschriebenen Heuristik aus run_example.py.
+    # der handgeschriebenen Heuristik aus dem alten Demo-Skript run_example.py.
     mopts = clone_mopts(index.prepare_optimization(query=query))
     if not mopts:
         return mopts
@@ -389,7 +427,7 @@ VARIANTS = [
     },
     {
         "name": "current_handcrafted",
-        "description": "Current handwritten optimizer from run_example.py",
+        "description": "Current handwritten optimizer from the old run_example.py demo",
         "builder": manual_current_handcrafted,
     },
     {
@@ -439,8 +477,8 @@ def archive_previous_outputs():
         OUT_DIR / "runtime_comparison.pdf",
         OUT_DIR / "speedup_vs_baseline.pdf",
         OUT_DIR / "speedup_vs_baseline_runtime.pdf",
-        OUT_DIR / "speedup_vs_baseline_ids_per_second.pdf",
-        OUT_DIR / "speedup_vs_baseline_mib_per_second.pdf",
+        OUT_DIR / "ids_per_second_comparison.pdf",
+        OUT_DIR / "mib_per_second_comparison.pdf",
     ]
     existing_summary_files = [path for path in summary_files if path.exists()]
     if existing_summary_files:
@@ -744,7 +782,8 @@ def plot_runtime_comparison(df: pd.DataFrame, figure_path: Path):
     ax.set_xlabel("Query")
     ax.set_title("mopts Runtime Comparison")
     ax.grid(axis="y", linestyle="--", linewidth=0.5)
-    plt.tight_layout()
+    add_query_notes(ax, pivot.index)
+    plt.tight_layout(rect=(0, 0.10, 1, 1))
     plt.savefig(figure_path)
     plt.close()
 
@@ -765,35 +804,27 @@ def plot_speedup_vs_baseline(df: pd.DataFrame, figure_path: Path):
     ax.set_title("Speedup Relative to the Main Baseline")
     ax.axhline(1.0, color="black", linestyle="--", linewidth=1.0)
     ax.grid(axis="y", linestyle="--", linewidth=0.5)
-    plt.tight_layout()
+    add_query_notes(ax, pivot.index)
+    plt.tight_layout(rect=(0, 0.10, 1, 1))
     plt.savefig(figure_path)
     plt.close()
 
 
-def plot_metric_ratio_vs_baseline(
+def plot_metric_comparison(
     df: pd.DataFrame,
     metric_column: str,
-    baseline_metric_column: str,
     figure_path: Path,
     ylabel: str,
     title: str,
 ):
-    baseline = (
-        df[df["variant"] == MAIN_BASELINE_VARIANT][["query_name", metric_column]]
-        .rename(columns={metric_column: baseline_metric_column})
-    )
-    merged = df.merge(baseline, on="query_name", how="left")
-    merged = merged[merged[baseline_metric_column].notna()].copy()
-    merged["ratio_vs_baseline"] = merged[metric_column] / merged[baseline_metric_column]
-
-    pivot = merged.pivot(index="query_name", columns="variant", values="ratio_vs_baseline")
+    pivot = df.pivot(index="query_name", columns="variant", values=metric_column)
     ax = pivot.plot(kind="bar", figsize=(12, 6))
     ax.set_ylabel(ylabel)
     ax.set_xlabel("Query")
     ax.set_title(title)
-    ax.axhline(1.0, color="black", linestyle="--", linewidth=1.0)
     ax.grid(axis="y", linestyle="--", linewidth=0.5)
-    plt.tight_layout()
+    add_query_notes(ax, pivot.index)
+    plt.tight_layout(rect=(0, 0.10, 1, 1))
     plt.savefig(figure_path)
     plt.close()
 
@@ -801,32 +832,30 @@ def plot_metric_ratio_vs_baseline(
 def generate_all_summary_plots(results_df: pd.DataFrame):
     runtime_pdf = OUT_DIR / "runtime_comparison.pdf"
     speedup_runtime_pdf = OUT_DIR / "speedup_vs_baseline_runtime.pdf"
-    speedup_ids_pdf = OUT_DIR / "speedup_vs_baseline_ids_per_second.pdf"
-    speedup_mib_pdf = OUT_DIR / "speedup_vs_baseline_mib_per_second.pdf"
+    ids_pdf = OUT_DIR / "ids_per_second_comparison.pdf"
+    mib_pdf = OUT_DIR / "mib_per_second_comparison.pdf"
 
     plot_runtime_comparison(results_df, runtime_pdf)
     plot_speedup_vs_baseline(results_df, speedup_runtime_pdf)
-    plot_metric_ratio_vs_baseline(
+    plot_metric_comparison(
         results_df,
         metric_column="ids_per_second",
-        baseline_metric_column="baseline_ids_per_second",
-        figure_path=speedup_ids_pdf,
-        ylabel=f"IDs/s relative to {MAIN_BASELINE_VARIANT}",
-        title="IDs per Second Relative to the Main Baseline",
+        figure_path=ids_pdf,
+        ylabel="IDs per Second",
+        title="IDs per Second Comparison",
     )
-    plot_metric_ratio_vs_baseline(
+    plot_metric_comparison(
         results_df,
         metric_column="read_mib_per_second",
-        baseline_metric_column="baseline_read_mib_per_second",
-        figure_path=speedup_mib_pdf,
-        ylabel=f"MiB/s relative to {MAIN_BASELINE_VARIANT}",
-        title="Read MiB/s Relative to the Main Baseline",
+        figure_path=mib_pdf,
+        ylabel="Read MiB per Second",
+        title="Read MiB per Second Comparison",
     )
     return [
         runtime_pdf,
         speedup_runtime_pdf,
-        speedup_ids_pdf,
-        speedup_mib_pdf,
+        ids_pdf,
+        mib_pdf,
     ]
 
 

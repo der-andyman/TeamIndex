@@ -14,7 +14,7 @@ import pandas as pd
 
 
 BASE_DIR = Path(__file__).resolve().parent
-STUDY_DIR = (BASE_DIR / "mopts_study").resolve()
+STUDY_DIR = (BASE_DIR / "results").resolve()
 PLANS_DIR = STUDY_DIR / "plans"
 PYTHON_RESULTS_CSV = STUDY_DIR / "results.csv"
 OUT_DIR = STUDY_DIR / "standalone"
@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument(
         "--pattern",
         default="*.json",
-        help="Glob pattern for exported plans inside mopts_study/plans.",
+        help="Glob pattern for exported plans inside study/results/plans.",
     )
     parser.add_argument(
         "--limit",
