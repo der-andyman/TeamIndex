@@ -1,0 +1,34 @@
+{
+  "name": "team_bench_grid_v1_n50k",
+  "description": "Erster systematischer team_bench-Block mit disjunkten Teams, konstanter Grid-Aufloesung und variierender Intersection-Groesse. Pilotlauf mit N=50_000.",
+  "defaults": {
+    "n": 50000,
+    "bins_per_dimension": 10,
+    "selected_bins_per_dimension": 4,
+    "value_domain_max": 100,
+    "attribute_prefix": "A",
+    "t_rel_values": [
+      0.1,
+      0.35,
+      0.6,
+      0.85
+    ],
+    "team_counts": [
+      2,
+      3
+    ],
+    "dimensions": [
+      2,
+      3
+    ],
+    "worker_count": 16,
+    "repetitions": 3,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "baseline_minimal_intersection",
+      "current_handcrafted",
+      "dynamic_selective_expansion"
+    ]
+  }
+}

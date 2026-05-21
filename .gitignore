@@ -23,7 +23,14 @@ minimal_example/toy_index_data.json
 # Lokale Studien-Artefakte
 study/study_index_data.json
 study/results/
+study/team_bench_results/
 study/__pycache__/
 
 # Local notes / analysis files
 MOPTS_STRATEGY_RESULT_NOTES.md
+
+# Lokaler Thesis-Ordner
+thesis/
+
+# Lokal erstellte Experimente auf Repo-Root-Ebene
+/experiments/
