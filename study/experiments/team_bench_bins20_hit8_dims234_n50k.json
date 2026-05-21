@@ -1,10 +1,10 @@
 {
-  "name": "team_bench_grid_v1_n50k",
-  "description": "Erster systematischer team_bench-Block mit disjunkten Teams, konstanter Grid-Aufloesung und variierender Intersection-Groesse. Pilotlauf mit N=50_000.",
+  "name": "team_bench_bins20_hit8_dims234_n50k",
+  "description": "Dritter systematischer team_bench-Block mit 20 Bins pro Dimension, 8 selektierten Bins pro Dimension und Team-Dimensionalitaeten 2D, 3D und 4D bei N=50_000.",
   "defaults": {
     "n": 50000,
-    "bins_per_dimension": 10,
-    "selected_bins_per_dimension": 4,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
     "value_domain_max": 100,
     "attribute_prefix": "A",
     "t_rel_values": [
@@ -19,7 +19,8 @@
     ],
     "dimensions": [
       2,
-      3
+      3,
+      4
     ],
     "worker_count": 16,
     "repetitions": 3,

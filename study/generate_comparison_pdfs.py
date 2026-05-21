@@ -88,7 +88,19 @@ def team_bench_tick_notes(summary_df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, ylabel: str, output_path: Path):
+def worker_count_note(results_df: pd.DataFrame | None, summary_df: pd.DataFrame | None = None) -> str:
+    source_df = results_df if results_df is not None else summary_df
+    if source_df is None or "worker_count" not in source_df.columns:
+        return "Thread-Anzahl: unbekannt"
+    unique_counts = sorted({int(value) for value in source_df["worker_count"].dropna().unique().tolist()})
+    if not unique_counts:
+        return "Thread-Anzahl: unbekannt"
+    if len(unique_counts) == 1:
+        return f"Thread-Anzahl: {unique_counts[0]}"
+    return "Thread-Anzahlen: " + ", ".join(str(value) for value in unique_counts)
+
+
+def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, ylabel: str, output_path: Path, subtitle: str | None = None):
     pivot = summary_df.pivot(index="scenario_id", columns="variant", values=metric_col)
     scenario_meta = (
         summary_df[["scenario_id", "family_name", "t_rel", "team_count", "dimension"]]
@@ -104,7 +116,7 @@ def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, y
         values = pivot[variant].to_numpy()
         ax.bar(x + idx * width - ((len(pivot.columns) - 1) * width / 2), values, width=width, label=variant)
 
-    ax.set_title(title)
+    ax.set_title(f"{title}\n{subtitle}" if subtitle else title)
     ax.set_ylabel(ylabel)
     ax.set_xlabel("Szenario")
     ax.set_xticks(x)
@@ -120,7 +132,7 @@ def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, y
     return output_path
 
 
-def plot_best_strategy_heatmap(summary_df: pd.DataFrame, output_path: Path):
+def plot_best_strategy_heatmap(summary_df: pd.DataFrame, output_path: Path, subtitle: str | None = None):
     best_df = summary_df.loc[summary_df.groupby("scenario_id")["runtime_ms_mean"].idxmin()].copy()
     families = sorted(best_df["family_name"].unique())
     t_rel_values = sorted(best_df["t_rel"].unique())
@@ -139,7 +151,7 @@ def plot_best_strategy_heatmap(summary_df: pd.DataFrame, output_path: Path):
     cmap = plt.cm.get_cmap("tab10", len(strategies))
     fig, ax = plt.subplots(figsize=(10, 5))
     im = ax.imshow(matrix, cmap=cmap, aspect="auto", vmin=-0.5, vmax=len(strategies) - 0.5)
-    ax.set_title("Beste Strategie pro team_bench-Szenario")
+    ax.set_title(f"Beste Strategie pro team_bench-Szenario\n{subtitle}" if subtitle else "Beste Strategie pro team_bench-Szenario")
     ax.set_xlabel("T_rel")
     ax.set_ylabel("Szenariofamilie")
     ax.set_xticks(np.arange(len(t_rel_values)))
@@ -177,6 +189,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
     )
     summary_df = summary_df.merge(baseline_df, on="scenario_id", how="left")
     summary_df["speedup_vs_baseline_runtime"] = summary_df["baseline_runtime_ms_mean"] / summary_df["runtime_ms_mean"]
+    subtitle = worker_count_note(results_df=results_df)
 
     plot_paths = []
     plot_paths.append(
@@ -186,6 +199,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             title="team_bench: Laufzeitvergleich",
             ylabel="Laufzeit [ms]",
             output_path=results_dir / "runtime_comparison.pdf",
+            subtitle=subtitle,
         )
     )
     plot_paths.append(
@@ -195,6 +209,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             title=f"team_bench: Speedup relativ zu {baseline}",
             ylabel="Speedup relativ zur Baseline",
             output_path=results_dir / "speedup_vs_baseline_runtime.pdf",
+            subtitle=subtitle,
         )
     )
     plot_paths.append(
@@ -204,6 +219,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             title="team_bench: IDs pro Sekunde",
             ylabel="IDs pro Sekunde",
             output_path=results_dir / "ids_per_second_comparison.pdf",
+            subtitle=subtitle,
         )
     )
     plot_paths.append(
@@ -213,12 +229,14 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             title="team_bench: MiB pro Sekunde",
             ylabel="MiB pro Sekunde",
             output_path=results_dir / "mib_per_second_comparison.pdf",
+            subtitle=subtitle,
         )
     )
     plot_paths.append(
         plot_best_strategy_heatmap(
             summary_df,
             output_path=results_dir / "best_strategy_heatmap.pdf",
+            subtitle=subtitle,
         )
     )
     return plot_paths

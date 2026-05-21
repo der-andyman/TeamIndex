@@ -86,9 +86,22 @@ def ensure_output_dir(path: Path):
     path.mkdir(parents=True, exist_ok=True)
 
 
-def create_run_output_dir(experiment_root: Path, experiment_name: str) -> Path:
+def determine_effective_worker_count(args, config: dict, scenarios: list[dict]) -> int | None:
+    if args.worker_count is not None:
+        return int(args.worker_count)
+    default_worker = config.get("defaults", {}).get("worker_count")
+    scenario_workers = {int(scenario["worker_count"]) for scenario in scenarios if "worker_count" in scenario}
+    if default_worker is not None:
+        scenario_workers.add(int(default_worker))
+    if len(scenario_workers) == 1:
+        return next(iter(scenario_workers))
+    return None
+
+
+def create_run_output_dir(experiment_root: Path, experiment_name: str, worker_count: int | None) -> Path:
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = experiment_root / f"{experiment_name}_{timestamp}"
+    worker_label = f"_w{worker_count}" if worker_count is not None else "_wmixed"
+    run_dir = experiment_root / f"{experiment_name}{worker_label}_{timestamp}"
     ensure_output_dir(run_dir)
     return run_dir
 
@@ -159,11 +172,25 @@ def main():
 
     experiment_root = Path(scenarios[0]["benchmark_output_root"])
     ensure_output_dir(experiment_root)
-    output_dir = create_run_output_dir(experiment_root, config["name"])
+    effective_worker_count = determine_effective_worker_count(args, config, scenarios)
+    output_dir = create_run_output_dir(experiment_root, config["name"], effective_worker_count)
     with (output_dir / "config_snapshot.json").open("w", encoding="utf-8") as fh:
         json.dump(config, fh, indent=2)
     with (output_dir / "scenarios_snapshot.json").open("w", encoding="utf-8") as fh:
         json.dump(scenarios, fh, indent=2)
+    with (output_dir / "run_metadata.json").open("w", encoding="utf-8") as fh:
+        json.dump(
+            {
+                "experiment_name": config["name"],
+                "effective_worker_count": effective_worker_count,
+                "worker_count_override": args.worker_count,
+                "repetitions_override": args.repetitions,
+                "scenario_filters": args.scenario_filter,
+                "variant_filters": args.variant_filter,
+            },
+            fh,
+            indent=2,
+        )
 
     result_rows = []
     mopts_rows = []

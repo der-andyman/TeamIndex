@@ -34,3 +34,7 @@ thesis/
 
 # Lokal erstellte Experimente auf Repo-Root-Ebene
 /experiments/
+
+# Lokale team_bench-Experimentkonfigurationen
+study/experiments/*
+!study/experiments/team_bench_bins20_hit8_dims234_n50k.json

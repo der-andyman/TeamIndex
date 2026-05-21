@@ -7,7 +7,7 @@ from typing import Any
 from study_paths import TEAM_BENCH_DATA_ROOT, TEAM_BENCH_EXPERIMENTS_DIR, TEAM_BENCH_RESULTS_ROOT
 
 
-DEFAULT_CONFIG_PATH = TEAM_BENCH_EXPERIMENTS_DIR / "team_bench_grid_v1.json"
+DEFAULT_CONFIG_PATH = TEAM_BENCH_EXPERIMENTS_DIR / "team_bench_bins20_hit8_dims234_n50k.json"
 
 
 def load_experiment_config(config_path: str | Path | None = None) -> dict[str, Any]:
