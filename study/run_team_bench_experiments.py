@@ -106,22 +106,36 @@ def create_run_output_dir(experiment_root: Path, experiment_name: str, worker_co
     return run_dir
 
 
-def write_outputs(output_dir: Path, result_rows, mopts_rows, baseline_variant: str):
+def write_outputs(output_dir: Path, result_rows, mopts_rows, baseline_variant: str, skipped_rows=None):
     results_df = pd.DataFrame(result_rows)
     mopts_df = pd.DataFrame(mopts_rows)
+    skipped_df = pd.DataFrame(skipped_rows or [])
 
     results_csv = output_dir / "results.csv"
     mopts_csv = output_dir / "mopts_per_team.csv"
     results_df.to_csv(results_csv, index=False)
     mopts_df.to_csv(mopts_csv, index=False)
+    if skipped_rows:
+        skipped_df.to_csv(output_dir / "skipped_variants.csv", index=False)
 
     if results_df.empty:
         return results_df, mopts_df, pd.DataFrame(), pd.DataFrame()
 
+    group_cols = [
+        "scenario_id",
+        "family_name",
+        "team_count",
+        "dimension",
+        "t_rel",
+        "n",
+        "worker_count",
+        "variant",
+    ]
     summary_df = (
         results_df
-        .groupby(["scenario_id", "variant"], as_index=False)
+        .groupby(group_cols, as_index=False)
         .agg(
+            repetition_count=("repetition", "nunique"),
             runtime_ms_mean=("executor_runtime_ms", "mean"),
             runtime_ms_std=("executor_runtime_ms", "std"),
             ids_per_second_mean=("ids_per_second", "mean"),
@@ -134,15 +148,34 @@ def write_outputs(output_dir: Path, result_rows, mopts_rows, baseline_variant: s
         )
     )
 
-    baseline_df = summary_df[summary_df["variant"] == baseline_variant][["scenario_id", "runtime_ms_mean"]].rename(
-        columns={"runtime_ms_mean": "baseline_runtime_ms_mean"}
+    for metric_prefix in ["runtime_ms", "ids_per_second", "read_mib_per_second"]:
+        mean_col = f"{metric_prefix}_mean"
+        std_col = f"{metric_prefix}_std"
+        rel_std_col = f"{metric_prefix}_rel_std"
+        summary_df[rel_std_col] = summary_df[std_col] / summary_df[mean_col]
+
+    baseline_df = summary_df[
+        summary_df["variant"] == baseline_variant
+    ][["scenario_id", "runtime_ms_mean", "ids_per_second_mean", "read_mib_per_second_mean"]].rename(
+        columns={
+            "runtime_ms_mean": "baseline_runtime_ms_mean",
+            "ids_per_second_mean": "baseline_ids_per_second_mean",
+            "read_mib_per_second_mean": "baseline_read_mib_per_second_mean",
+        }
     )
     summary_df = summary_df.merge(baseline_df, on="scenario_id", how="left")
     summary_df["speedup_vs_baseline"] = summary_df["baseline_runtime_ms_mean"] / summary_df["runtime_ms_mean"]
+    summary_df["throughput_ratio_vs_baseline"] = (
+        summary_df["ids_per_second_mean"] / summary_df["baseline_ids_per_second_mean"]
+    )
+    summary_df["bandwidth_ratio_vs_baseline"] = (
+        summary_df["read_mib_per_second_mean"] / summary_df["baseline_read_mib_per_second_mean"]
+    )
 
     best_idx = summary_df.groupby("scenario_id")["runtime_ms_mean"].idxmin()
-    best_df = summary_df.loc[best_idx].sort_values("scenario_id")
+    best_df = summary_df.loc[best_idx].sort_values(["team_count", "dimension", "t_rel", "scenario_id"])
 
+    summary_df = summary_df.sort_values(["team_count", "dimension", "t_rel", "scenario_id", "variant"]).reset_index(drop=True)
     summary_df.to_csv(output_dir / "summary_by_variant.csv", index=False)
     best_df.to_csv(output_dir / "best_strategy_by_scenario.csv", index=False)
     return results_df, mopts_df, summary_df, best_df
@@ -194,7 +227,11 @@ def main():
 
     result_rows = []
     mopts_rows = []
+    skipped_rows = []
     repetitions = int(args.repetitions or config["defaults"]["repetitions"])
+    safety_config = config.get("safety", {})
+    max_ise_count = safety_config.get("max_ise_count")
+    max_ise_count = int(max_ise_count) if max_ise_count is not None else None
 
     for scenario_index, scenario in enumerate(scenarios, start=1):
         scenario_id = scenario["scenario_id"]
@@ -218,6 +255,7 @@ def main():
         index.default_runtime_config["OptimizerConfig"]["allow_exclusion"] = False
         worker_count = int(args.worker_count or scenario["worker_count"])
         runtime_config = build_runtime_config(worker_count, args.verbose_runtime)
+        index.default_runtime_config["worker_count"] = worker_count
 
         for repetition in range(1, repetitions + 1):
             print(f"  repetition {repetition}/{repetitions}")
@@ -229,6 +267,32 @@ def main():
                 query_structure["ise_count_estimate_manual"] = product(
                     [int(opts["group_count"]) for _, opts in executed_mopts if opts["is_expanded"]]
                 ) if query_structure["expanded_team_count_manual"] > 0 else 0
+
+                if (
+                    max_ise_count is not None
+                    and int(query_structure["ise_count_estimate_manual"]) > max_ise_count
+                ):
+                    skipped_rows.append(
+                        {
+                            "scenario_id": scenario_id,
+                            "family_name": scenario["family_name"],
+                            "team_count": scenario["team_count"],
+                            "dimension": scenario["dimension"],
+                            "t_rel": scenario["t_rel"],
+                            "variant": variant_name,
+                            "repetition": repetition,
+                            "worker_count": runtime_config["worker_count"],
+                            "reason": "ise_count_estimate_above_limit",
+                            "ise_count_estimate_manual": int(query_structure["ise_count_estimate_manual"]),
+                            "max_ise_count": max_ise_count,
+                        }
+                    )
+                    print(
+                        f"    {variant_name}: skipped, estimated ISE "
+                        f"{query_structure['ise_count_estimate_manual']} > limit {max_ise_count}"
+                    )
+                    continue
+
                 bin_info_by_team, bin_summary = summarize_bin_selection(index, scenario["query"], executed_mopts)
                 query_structure.update(bin_summary)
 
@@ -281,9 +345,9 @@ def main():
                     f"result={len(result_ids)}, ise={global_info['ise_count']}"
                 )
 
-            write_outputs(output_dir, result_rows, mopts_rows, scenario["baseline_variant"])
+            write_outputs(output_dir, result_rows, mopts_rows, scenario["baseline_variant"], skipped_rows)
 
-    _, _, summary_df, best_df = write_outputs(output_dir, result_rows, mopts_rows, scenarios[0]["baseline_variant"])
+    _, _, summary_df, best_df = write_outputs(output_dir, result_rows, mopts_rows, scenarios[0]["baseline_variant"], skipped_rows)
     plot_paths = generate_team_bench_plots(
         output_dir,
         pd.read_csv(output_dir / "results.csv"),
@@ -294,6 +358,8 @@ def main():
     print(output_dir / "mopts_per_team.csv")
     print(output_dir / "summary_by_variant.csv")
     print(output_dir / "best_strategy_by_scenario.csv")
+    if skipped_rows:
+        print(output_dir / "skipped_variants.csv")
     print("\nCreated plots:")
     for plot_path in plot_paths:
         print(plot_path)

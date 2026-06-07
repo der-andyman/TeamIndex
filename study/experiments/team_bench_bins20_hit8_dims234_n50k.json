@@ -29,6 +29,7 @@
       "baseline_union_first",
       "baseline_minimal_intersection",
       "current_handcrafted",
+      "bounded_selective_expansion",
       "dynamic_selective_expansion"
     ]
   }

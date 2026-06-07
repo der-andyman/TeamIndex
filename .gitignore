@@ -28,6 +28,7 @@ study/__pycache__/
 
 # Local notes / analysis files
 MOPTS_STRATEGY_RESULT_NOTES.md
+study/export_thesis_tables.py
 
 # Lokaler Thesis-Ordner
 thesis/

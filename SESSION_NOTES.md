@@ -177,3 +177,44 @@
 - DRAM-Cache über mehrere Runs prüfen:
   - aktuell lädt der DRAM-Backend pro Run nur die query-relevanten Team-Dateien, aber bei wiederholten Läufen werden diese Teams erneut in den RAM geladen
   - spätere Optimierungsidee: persistenter Team-Cache für den DRAM-Backend, damit identische oder ähnliche Queries bereits geladene Teams wiederverwenden können
+
+## 11. team_bench / Strategiewahl statt perfekter Optimierer
+
+- Aktueller Fokus wurde nach den Max-Notizen verschoben:
+  - nicht mehr "einen Optimierer finden, der immer gewinnt"
+  - sondern systematisch herausfinden, welche Strategie in welcher Situation sinnvoll ist
+  - wichtig ist die Trennung zwischen konkreter Strategie und der späteren Wahl einer Strategie anhand vorab verfügbarer Query-Metriken
+- Relevante Situationen im aktuellen Scope:
+  - `2D` als Kontroll- und Overhead-/Rauschbereich
+  - `3D` und `4D` als Hauptbereich
+  - `5D` als kontrollierter Stressbereich
+  - `2` und `3` Teams
+  - `T_rel` als Regler für Intersection-Anteil und Drag
+  - `worker_count` als eigener Skalierungsfaktor
+- [TEAM_BENCH_SCOPE_NOTES.md](/home/duman/TeamIndex/study/TEAM_BENCH_SCOPE_NOTES.md) wurde angelegt:
+  - kurze Methodik-/Scope-Notiz für `team_bench`
+  - beschreibt Situationsraum, Strategieraum, Messgrößen und erste Interpretation
+  - ist kein Ergebnisartefakt wie CSV/PDF, sondern eine versionierte Orientierung für die weitere Arbeit
+- Die Plot-/Summary-Erzeugung wurde erweitert:
+  - Standardabweichungen werden in den Comparison-PDFs als Fehlerbalken verwendet
+  - Heatmaps wurden so angepasst, dass die Y-Achse nur eine Dimension enthält und die Darstellung besser lesbar ist
+  - `summary_by_variant.csv` enthält zusätzliche Metadaten und relative Standardabweichungen
+- [run_team_bench_experiments.py](/home/duman/TeamIndex/study/run_team_bench_experiments.py) wurde robuster:
+  - schreibt `skipped_variants.csv` nur noch, wenn wirklich Varianten übersprungen wurden
+  - kann Varianten mit zu hoher geschätzter ISE Count vor der Ausführung überspringen
+  - setzt den effektiven `worker_count` auch im `index.default_runtime_config`, damit dynamische Strategien den Run korrekt sehen
+- Neue Analyseskripte:
+  - [analyze_handcrafted_behavior.py](/home/duman/TeamIndex/study/analyze_handcrafted_behavior.py) untersucht, warum `current_handcrafted` gut abschneidet
+  - [analyze_strategy_selection.py](/home/duman/TeamIndex/study/analyze_strategy_selection.py) fasst mehrere `team_bench`-Runs zusammen und erzeugt Reports für Strategiewahl, Gewinner, Varianz, Planmerkmale und Feature-Tabellen
+  - `study/export_thesis_tables.py` bleibt ein lokales persönliches Hilfsskript und wird per `.gitignore` ignoriert
+- Erste Auswertung aktueller Kernläufe:
+  - `2D` ist stark varianz- und overheadgeprägt; dort sind No-Expansion-Strategien oft sinnvoll
+  - `3D` bis `5D` profitieren häufig von gebremster Ein-Team-Expansion
+  - `current_handcrafted` gewinnt oft, weil es Expansion und Gruppierung kombiniert: frühes Pruning ja, aber ISE Count begrenzt
+  - `dynamic_selective_expansion` ist in den team_bench-Szenarien oft zu konservativ und bleibt Union-First-ähnlich
+  - `baseline_minimal_intersection` zeigt den Preis ungebremster Expansion und wird in höheren Dimensionen schnell sehr teuer oder sicherheitshalber übersprungen
+- Neuer Strategiekandidat:
+  - [mopts_strategies.py](/home/duman/TeamIndex/study/mopts_strategies.py) enthält jetzt `bounded_selective_expansion`
+  - Idee: in 2D bewusst nicht expandieren, ab 3D große Team-Ergebnisse gruppieren und nur ein selektives Team expandieren
+  - Pilotläufe zeigen, dass diese Variante mehrere 3D/4D/5D-Szenarien gewinnt und sonst meist nah an `current_handcrafted` bleibt
+  - damit ist sie ein sinnvoller zusätzlicher Punkt im Strategieraum, aber noch keine endgültige neue Default-Strategie

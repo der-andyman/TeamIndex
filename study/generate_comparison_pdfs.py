@@ -16,6 +16,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import matplotlib
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -74,11 +75,16 @@ def short_scenario_label(row: pd.Series) -> str:
     return f"{int(row['team_count'])}T-{int(row['dimension'])}D-{float(row['t_rel']):.2f}"
 
 
+def order_team_bench_summary(summary_df: pd.DataFrame) -> pd.DataFrame:
+    sort_cols = [col for col in ["team_count", "dimension", "t_rel", "scenario_id", "variant"] if col in summary_df.columns]
+    return summary_df.sort_values(sort_cols).reset_index(drop=True)
+
+
 def team_bench_tick_notes(summary_df: pd.DataFrame) -> str:
     scenario_meta = (
         summary_df[["scenario_id", "family_name", "team_count", "dimension", "t_rel"]]
         .drop_duplicates()
-        .sort_values(["family_name", "t_rel"])
+        .sort_values(["team_count", "dimension", "t_rel", "scenario_id"])
     )
     notes = [
         f"{short_scenario_label(row)} = {row['family_name']}, T_rel={float(row['t_rel']):.2f}"
@@ -100,8 +106,20 @@ def worker_count_note(results_df: pd.DataFrame | None, summary_df: pd.DataFrame 
     return "Thread-Anzahlen: " + ", ".join(str(value) for value in unique_counts)
 
 
-def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, ylabel: str, output_path: Path, subtitle: str | None = None):
+def plot_grouped_metric(
+    summary_df: pd.DataFrame,
+    metric_col: str,
+    title: str,
+    ylabel: str,
+    output_path: Path,
+    subtitle: str | None = None,
+    error_col: str | None = None,
+):
+    summary_df = order_team_bench_summary(summary_df)
     pivot = summary_df.pivot(index="scenario_id", columns="variant", values=metric_col)
+    error_pivot = None
+    if error_col is not None and error_col in summary_df.columns:
+        error_pivot = summary_df.pivot(index="scenario_id", columns="variant", values=error_col).reindex(index=pivot.index, columns=pivot.columns)
     scenario_meta = (
         summary_df[["scenario_id", "family_name", "t_rel", "team_count", "dimension"]]
         .drop_duplicates()
@@ -114,9 +132,27 @@ def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, y
     fig, ax = plt.subplots(figsize=(max(12, len(pivot.index) * 0.9), 7))
     for idx, variant in enumerate(pivot.columns):
         values = pivot[variant].to_numpy()
-        ax.bar(x + idx * width - ((len(pivot.columns) - 1) * width / 2), values, width=width, label=variant)
+        errors = None
+        if error_pivot is not None:
+            raw_errors = np.nan_to_num(error_pivot[variant].to_numpy(), nan=0.0)
+            if np.any(raw_errors > 0):
+                errors = raw_errors
+        ax.bar(
+            x + idx * width - ((len(pivot.columns) - 1) * width / 2),
+            values,
+            width=width,
+            label=variant,
+            yerr=errors,
+            capsize=3 if errors is not None else 0,
+            error_kw={"elinewidth": 0.9, "capthick": 0.9, "alpha": 0.75},
+        )
 
-    ax.set_title(f"{title}\n{subtitle}" if subtitle else title)
+    title_lines = [title]
+    if subtitle:
+        title_lines.append(subtitle)
+    if error_col is not None:
+        title_lines.append("Fehlerbalken: Standardabweichung ueber Wiederholungen")
+    ax.set_title("\n".join(title_lines))
     ax.set_ylabel(ylabel)
     ax.set_xlabel("Szenario")
     ax.set_xticks(x)
@@ -126,47 +162,67 @@ def plot_grouped_metric(summary_df: pd.DataFrame, metric_col: str, title: str, y
 
     note_text = team_bench_tick_notes(summary_df)
     fig.text(0.5, 0.01, note_text, ha="center", va="bottom", fontsize=9)
-    fig.tight_layout(rect=[0, 0.10, 1, 1])
+    fig.tight_layout(rect=[0, 0.11, 1, 1])
     fig.savefig(output_path, bbox_inches="tight")
     plt.close(fig)
     return output_path
 
 
 def plot_best_strategy_heatmap(summary_df: pd.DataFrame, output_path: Path, subtitle: str | None = None):
+    summary_df = order_team_bench_summary(summary_df)
     best_df = summary_df.loc[summary_df.groupby("scenario_id")["runtime_ms_mean"].idxmin()].copy()
-    families = sorted(best_df["family_name"].unique())
+    team_counts = sorted(best_df["team_count"].unique())
+    dimensions = sorted(best_df["dimension"].unique())
     t_rel_values = sorted(best_df["t_rel"].unique())
     strategies = sorted(best_df["variant"].unique())
     strategy_to_id = {name: idx for idx, name in enumerate(strategies)}
+    cmap = matplotlib.colormaps["tab10"].resampled(len(strategies))
+    fig, axes = plt.subplots(
+        1,
+        len(team_counts),
+        figsize=(max(10, 4.5 * len(team_counts)), 4.8),
+        squeeze=False,
+        sharey=True,
+    )
 
-    matrix = np.full((len(families), len(t_rel_values)), np.nan)
-    label_matrix = [["" for _ in t_rel_values] for _ in families]
+    for axis, team_count in zip(axes[0], team_counts):
+        subset = best_df[best_df["team_count"] == team_count]
+        matrix = np.full((len(dimensions), len(t_rel_values)), np.nan)
+        label_matrix = [["" for _ in t_rel_values] for _ in dimensions]
 
-    for _, row in best_df.iterrows():
-        y = families.index(row["family_name"])
-        x = t_rel_values.index(row["t_rel"])
-        matrix[y, x] = strategy_to_id[row["variant"]]
-        label_matrix[y][x] = row["variant"].replace("baseline_", "b_").replace("current_", "cur_").replace("dynamic_", "dyn_")
+        for _, row in subset.iterrows():
+            y = dimensions.index(row["dimension"])
+            x = t_rel_values.index(row["t_rel"])
+            matrix[y, x] = strategy_to_id[row["variant"]]
+            label_matrix[y][x] = (
+                row["variant"]
+                .replace("baseline_", "b_")
+                .replace("current_", "cur_")
+                .replace("dynamic_", "dyn_")
+            )
 
-    cmap = plt.cm.get_cmap("tab10", len(strategies))
-    fig, ax = plt.subplots(figsize=(10, 5))
-    im = ax.imshow(matrix, cmap=cmap, aspect="auto", vmin=-0.5, vmax=len(strategies) - 0.5)
-    ax.set_title(f"Beste Strategie pro team_bench-Szenario\n{subtitle}" if subtitle else "Beste Strategie pro team_bench-Szenario")
-    ax.set_xlabel("T_rel")
-    ax.set_ylabel("Szenariofamilie")
-    ax.set_xticks(np.arange(len(t_rel_values)))
-    ax.set_xticklabels([f"{value:.2f}" for value in t_rel_values])
-    ax.set_yticks(np.arange(len(families)))
-    ax.set_yticklabels(families)
+        axis.imshow(matrix, cmap=cmap, aspect="auto", vmin=-0.5, vmax=len(strategies) - 0.5)
+        axis.set_title(f"{team_count} Teams")
+        axis.set_xlabel("T_rel")
+        axis.set_xticks(np.arange(len(t_rel_values)))
+        axis.set_xticklabels([f"{value:.2f}" for value in t_rel_values])
+        axis.set_yticks(np.arange(len(dimensions)))
+        axis.set_yticklabels([f"{dimension}D" for dimension in dimensions])
+        if axis is axes[0][0]:
+            axis.set_ylabel("Teamdimensionalitaet")
 
-    for y in range(len(families)):
-        for x in range(len(t_rel_values)):
-            if label_matrix[y][x]:
-                ax.text(x, y, label_matrix[y][x], ha="center", va="center", fontsize=8, color="black")
+        for y in range(len(dimensions)):
+            for x in range(len(t_rel_values)):
+                if label_matrix[y][x]:
+                    axis.text(x, y, label_matrix[y][x], ha="center", va="center", fontsize=8, color="black")
 
+    title = "Beste Strategie pro team_bench-Szenario"
+    if subtitle:
+        title = f"{title}\n{subtitle}"
+    fig.suptitle(title)
     patches = [mpatches.Patch(color=cmap(idx), label=name) for name, idx in strategy_to_id.items()]
-    ax.legend(handles=patches, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
-    fig.tight_layout(rect=[0, 0.05, 1, 1])
+    fig.legend(handles=patches, loc="lower center", bbox_to_anchor=(0.5, -0.02), ncol=2 + (len(strategies) > 4))
+    fig.tight_layout(rect=[0, 0.08, 1, 0.92])
     fig.savefig(output_path, bbox_inches="tight")
     plt.close(fig)
     return output_path
@@ -175,13 +231,18 @@ def plot_best_strategy_heatmap(summary_df: pd.DataFrame, output_path: Path, subt
 def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, baseline_variant: str | None):
     summary_df = (
         results_df
-        .groupby(["scenario_id", "family_name", "team_count", "dimension", "t_rel", "variant"], as_index=False)
+        .groupby(["scenario_id", "family_name", "team_count", "dimension", "t_rel", "n", "worker_count", "variant"], as_index=False)
         .agg(
+            repetition_count=("repetition", "nunique"),
             runtime_ms_mean=("executor_runtime_ms", "mean"),
+            runtime_ms_std=("executor_runtime_ms", "std"),
             ids_per_second_mean=("ids_per_second", "mean"),
+            ids_per_second_std=("ids_per_second", "std"),
             read_mib_per_second_mean=("read_mib_per_second", "mean"),
+            read_mib_per_second_std=("read_mib_per_second", "std"),
         )
     )
+    summary_df = order_team_bench_summary(summary_df)
 
     baseline = choose_baseline_variant(summary_df["variant"].unique().tolist(), baseline_variant)
     baseline_df = summary_df[summary_df["variant"] == baseline][["scenario_id", "runtime_ms_mean"]].rename(
@@ -200,6 +261,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             ylabel="Laufzeit [ms]",
             output_path=results_dir / "runtime_comparison.pdf",
             subtitle=subtitle,
+            error_col="runtime_ms_std",
         )
     )
     plot_paths.append(
@@ -220,6 +282,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             ylabel="IDs pro Sekunde",
             output_path=results_dir / "ids_per_second_comparison.pdf",
             subtitle=subtitle,
+            error_col="ids_per_second_std",
         )
     )
     plot_paths.append(
@@ -230,6 +293,7 @@ def generate_team_bench_plots(results_dir: Path, results_df: pd.DataFrame, basel
             ylabel="MiB pro Sekunde",
             output_path=results_dir / "mib_per_second_comparison.pdf",
             subtitle=subtitle,
+            error_col="read_mib_per_second_std",
         )
     )
     plot_paths.append(

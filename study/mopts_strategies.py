@@ -119,6 +119,91 @@ def manual_current_handcrafted(index: eva.TeamIndex, query: str):
     return mopts
 
 
+def _team_dimension(index: eva.TeamIndex, team_name: str) -> int:
+    return len(index.cardinalities[team_name].shape)
+
+
+def _bounded_group_count(max_group_count: int, worker_budget: int) -> int:
+    if max_group_count <= 1:
+        return 1
+    if max_group_count <= 128:
+        return max_group_count
+
+    # sqrt grouping keeps large unions manageable without exploding ISE count.
+    target = eva.po2_near_sqrt(max_group_count)
+    return max(1, min(max_group_count, target, max(128, worker_budget * 4)))
+
+
+def manual_bounded_selective_expansion(index: eva.TeamIndex, query: str):
+    # Optimizer: Bounded Selective Expansion
+    # --------------------------------------
+    # Was passiert?
+    # - 2D-Faelle bleiben bewusst Union-First-aehnlich, weil dort Overhead
+    #   und Varianz schnell den Nutzen der Expansion auffressen.
+    # - ab 3D werden grosse Team-Ergebnisse zuerst auf eine begrenzte
+    #   Gruppenzahl reduziert
+    # - expandiert wird nur ein selektives Team, damit fruehes Pruning
+    #   moeglich ist, ohne ungebremste ISE Counts zu erzeugen
+    mopts = clone_mopts(index.prepare_optimization(query=query))
+    if len(mopts) <= 1:
+        return mopts
+
+    worker_budget = max(1, int(index.default_runtime_config.get("worker_count", 16) or 16))
+    team_dims = [_team_dimension(index, team_name) for team_name, _ in mopts]
+    if max(team_dims, default=0) <= 2:
+        return mopts
+
+    candidates = []
+    for pos, (team_name, opt) in enumerate(mopts):
+        if not bool(opt.get("is_included", True)):
+            continue
+
+        dimension = _team_dimension(index, team_name)
+        max_groups = max(1, int(opt.get("max_group_count", opt.get("group_count", 1))))
+        bounded_groups = _bounded_group_count(max_groups, worker_budget)
+        opt["group_count"] = bounded_groups
+
+        if dimension < 3 or bounded_groups <= 1:
+            continue
+
+        candidates.append(
+            {
+                "pos": pos,
+                "bounded_groups": bounded_groups,
+                "union_cardinality": max(1, int(opt["union_cardinality"])),
+                "dimension": dimension,
+            }
+        )
+
+    if not candidates:
+        return mopts
+
+    candidates = sorted(
+        candidates,
+        key=lambda item: (
+            item["union_cardinality"],
+            -item["dimension"],
+            item["bounded_groups"],
+        ),
+    )
+    first = candidates[0]
+    mopts[first["pos"]][1]["is_expanded"] = True
+
+    # Ein zweites Team nur bei sehr feiner erster Expansion. Das verhindert
+    # den alten "expandiere alles"-Fehler, erlaubt aber mehr Parallelitaet,
+    # wenn die erste Expansion kaum ISEs erzeugt.
+    current_ise = first["bounded_groups"]
+    second_limit = max(worker_budget, 32)
+    if current_ise < max(8, worker_budget // 2):
+        for candidate in candidates[1:]:
+            projected_ise = current_ise * candidate["bounded_groups"]
+            if projected_ise <= second_limit:
+                mopts[candidate["pos"]][1]["is_expanded"] = True
+                break
+
+    return mopts
+
+
 def manual_expand_all_adaptive_grouping(index: eva.TeamIndex, query: str):
     # Optimizer: Expand All Adaptive Grouping
     # ---------------------------------------
@@ -315,6 +400,11 @@ VARIANTS = [
         "name": "current_handcrafted",
         "description": "Current handwritten optimizer from the old run_example.py demo",
         "builder": manual_current_handcrafted,
+    },
+    {
+        "name": "bounded_selective_expansion",
+        "description": "Selective one-team expansion with bounded grouping and no 2D expansion",
+        "builder": manual_bounded_selective_expansion,
     },
     {
         "name": "dynamic_selective_expansion",
