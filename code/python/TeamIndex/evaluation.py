@@ -302,7 +302,8 @@ def _determine_groups(merged_list_sizes, group_count, list_count, assign_per_req
     assert(group_count > 0)
     if group_count == 1:
         # i.e., all lists are unioned in the same group
-        return [np.repeat(0, len(list_sizes)).astype(np.uint32) for list_sizes in merged_list_sizes], group_count, group_count
+        leaf_count = sum(len(list_sizes) for list_sizes in merged_list_sizes)
+        return [np.repeat(0, len(list_sizes)).astype(np.uint32) for list_sizes in merged_list_sizes], leaf_count, leaf_count
     elif group_count == list_count:
         # i.e., every list is in its own group, i.e., there will be no  per-group-union!
         counter = itcount()

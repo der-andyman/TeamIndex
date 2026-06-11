@@ -86,6 +86,51 @@ def manual_baseline_minimal_intersection(index: eva.TeamIndex, query: str):
     return mopts
 
 
+def manual_union_first_parallel(index: eva.TeamIndex, query: str):
+    # Optimizer: Union First Parallel
+    # -------------------------------
+    # Was passiert?
+    # - keine Expansion, also bleibt der Plan logisch Union-First-aehnlich
+    # - grosse Team-Unions werden aber in eine worker-orientierte Anzahl
+    #   balancierter Gruppen zerlegt
+    # - die Runtime verteilt die Blaetter innerhalb dieser Gruppen bereits
+    #   greedily nach Listengroesse/Cardinality
+    #
+    # Idee:
+    # Mehr physische Parallelitaet fuer grosse Unions, ohne die ISE Count
+    # durch weitere logische Expansion zu erhoehen.
+    mopts = clone_mopts(index.prepare_optimization(query=query))
+    if not mopts:
+        return mopts
+
+    worker_budget = max(1, int(index.default_runtime_config.get("worker_count", 16) or 16))
+    included = [(team_name, opt) for team_name, opt in mopts if bool(opt.get("is_included", True))]
+    if not included:
+        return mopts
+
+    total_union_cardinality = sum(max(1, int(opt["union_cardinality"])) for _, opt in included)
+    total_group_budget = max(worker_budget, len(included) * 2)
+
+    for _, opt in mopts:
+        opt["is_expanded"] = False
+        max_groups = max(1, int(opt.get("max_group_count", opt.get("group_count", 1))))
+        if max_groups <= 1:
+            opt["group_count"] = 1
+            continue
+
+        union_cardinality = max(1, int(opt["union_cardinality"]))
+        share = union_cardinality / total_union_cardinality
+        target_groups = max(1, int(math.ceil(total_group_budget * share)))
+
+        # Keep very large teams from collapsing into too few giant unions.
+        if max_groups > worker_budget * 8:
+            target_groups = max(target_groups, worker_budget)
+
+        opt["group_count"] = min(max_groups, target_groups)
+
+    return mopts
+
+
 def manual_current_handcrafted(index: eva.TeamIndex, query: str):
     # Optimizer: Current Handcrafted
     # --------------------------------
@@ -395,6 +440,11 @@ VARIANTS = [
         "name": "baseline_minimal_intersection",
         "description": "Minimal intersection baseline: expand only the smallest team, no grouping",
         "builder": manual_baseline_minimal_intersection,
+    },
+    {
+        "name": "union_first_parallel",
+        "description": "Union-first plan with parallelized per-team union groups",
+        "builder": manual_union_first_parallel,
     },
     {
         "name": "current_handcrafted",

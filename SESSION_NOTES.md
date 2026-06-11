@@ -218,3 +218,157 @@
   - Idee: in 2D bewusst nicht expandieren, ab 3D große Team-Ergebnisse gruppieren und nur ein selektives Team expandieren
   - Pilotläufe zeigen, dass diese Variante mehrere 3D/4D/5D-Szenarien gewinnt und sonst meist nah an `current_handcrafted` bleibt
   - damit ist sie ein sinnvoller zusätzlicher Punkt im Strategieraum, aber noch keine endgültige neue Default-Strategie
+
+## 12. Union First Parallel
+
+- Neuer Strategiekandidat in [mopts_strategies.py](/home/duman/TeamIndex/study/mopts_strategies.py):
+  - `union_first_parallel`
+  - expandiert kein Team
+  - bleibt logisch Union-First-ähnlich
+  - reduziert aber die `group_count` pro Team auf eine worker-orientierte, cardinality-gewichtete Gruppenzahl
+- Wichtiges Detail aus [evaluation.py](/home/duman/TeamIndex/code/python/TeamIndex/evaluation.py):
+  - `_determine_groups(...)` verteilt Blätter innerhalb einer gesetzten Gruppenzahl bereits greedily nach Listengröße/Cardinality
+  - die neue Strategie muss daher nicht selbst einzelne Blätter zuweisen
+  - ihr Hebel ist die Frage, wie viele Gruppen pro Team sinnvoll sind
+- Motivation:
+  - bisher kam Parallelität vor allem durch Expansion und damit durch mehr ISEs
+  - diese Variante testet physische Parallelität ohne zusätzliche logische Expansion
+  - dadurch kann die ISE Count bei `0` bleiben, während große Team-Unions trotzdem in weniger, aber besser balancierte Arbeitseinheiten zerlegt werden
+- Pilotläufe:
+  - 12-Szenario-Pilot (`3T-2D`, `2T-3D`, `2T-4D`) mit w16:
+    - `union_first_parallel` gewinnt 4 von 12 Szenarien
+    - in 2T-3D ist es im Mittel die schnellste Variante
+    - in 2T-4D liegt es im Mittel praktisch gleichauf mit den besten expandierenden Strategien
+  - 5D-Pilot (`2T-5D`, `3T-5D`) mit w16:
+    - `union_first_parallel` gewinnt 5 von 8 Szenarien
+    - bleibt dabei bei `ISE=0`, während `current_handcrafted` und `bounded_selective_expansion` typischerweise `ISE=128` erzeugen
+- Neue Arbeitshypothese:
+  - Es gibt mindestens drei getrennte Optimierungsachsen:
+    - ob expandiert wird
+    - wie stark gruppiert wird
+    - ob Union-Arbeit physisch passend zur Workerzahl balanciert wird
+  - Für einige hohe Dimensionen kann physische Union-Parallelisierung besser sein als frühe Intersection durch Expansion.
+
+## 13. Full/Close Runs mit Union First Parallel
+
+- Am `2026-06-07` wurden die Kernexperimente mit `union_first_parallel` wiederholt:
+  - Full `dims234`, w16, 3 Wiederholungen:
+    - `/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_dims234_n50k/team_bench_bins20_hit8_dims234_n50k_w16_2026-06-07_22-03-40`
+  - Full `dims345`, w16, 3 Wiederholungen:
+    - `/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_dims345_n50k/team_bench_bins20_hit8_dims345_n50k_w16_2026-06-07_22-06-35`
+  - Close Cases `dims234`, w16, 10 Wiederholungen:
+    - `/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_dims234_n50k/team_bench_bins20_hit8_dims234_n50k_w16_2026-06-07_22-20-07`
+  - Close Cases `dims345`, w16, 10 Wiederholungen:
+    - `/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_dims345_n50k/team_bench_bins20_hit8_dims345_n50k_w16_2026-06-07_22-26-08`
+- Zusammenfassende Reports:
+  - Full:
+    - `/home/duman/TeamIndex/study/team_bench_results/strategy_selection_analysis/full_union_first_parallel_core/strategy_selection_report.md`
+  - Close Cases:
+    - `/home/duman/TeamIndex/study/team_bench_results/strategy_selection_analysis/close_cases_w16_reps10/strategy_selection_report.md`
+- Ergebnis aus den 48 Full-Szenarien:
+  - `union_first_parallel` ist gegenueber Union First in `48/48` Faellen mindestens 10 Prozent schneller
+  - mittlerer Faktor gegenueber Union First: `1.383`
+  - in `33/48` Faellen ist `union_first_parallel` mindestens 2 Prozent schneller als `current_handcrafted`
+  - `dynamic_selective_expansion` ist in `40` Faellen mehr als 10 Prozent langsamer als `current_handcrafted`
+- Ergebnis aus den 25 Close Cases mit 10 Wiederholungen:
+  - `union_first_parallel` ist gegenueber Union First in `25/25` Faellen mindestens 10 Prozent schneller
+  - mittlerer Faktor gegenueber Union First: `1.346`
+  - in `18/25` Faellen ist `union_first_parallel` mindestens 2 Prozent schneller als `current_handcrafted`
+  - alle `25/25` Close Cases sind weiterhin knapp oder varianzempfindlich, d.h. die Standardabweichungen ueberlappen
+- Interpretation:
+  - Die neuen Ergebnisse bestaetigen Max' Hinweis zur Varianz: einzelne Siegerlabels sind in knappen Faellen nicht robust genug
+  - Trotzdem ist das Muster stabil genug, um `union_first_parallel` als eigene Planfamilie zu behandeln
+  - `4D` wirkt aktuell wie ein Grenzbereich zwischen gebremster Expansion und physischer Union-Balancierung
+  - `5D` spricht stark fuer physische Union-Balancierung, weil Expansion dort typischerweise `ISE=128` erzeugt, waehrend `union_first_parallel` bei `ISE=0` bleibt
+- Aktueller Regelentwurf:
+  - `2D`: Kontroll-/Overheadbereich; No-Expansion ernst nehmen
+  - `3D`: Union First Parallel ist meist stark, gebremste Expansion bleibt nahe dran
+  - `4D`: Entscheidungsgrenze; beide Familien vergleichen und Varianz berichten
+  - `5D`: Union First Parallel ist im aktuellen Scope der staerkste Kandidat
+  - hohe ISE Counts vor Ausfuehrung pruefen und ggf. verwerfen oder staerker gruppieren
+
+## 14. Strategy Selection Visuals
+
+- Neues Visualisierungsskript:
+  - [strategy_selection_to_plots.py](/home/duman/TeamIndex/study/strategy_selection_to_plots.py)
+  - liest vorhandene `strategy_selection_analysis`-CSVs
+  - fuehrt keine Benchmarks aus
+  - erzeugt einzelne PDFs und ein mehrseitiges `strategy_selection_dashboard.pdf`
+- Erzeugte Visuals fuer:
+  - `/home/duman/TeamIndex/study/team_bench_results/strategy_selection_analysis/full_union_first_parallel_core/plots`
+  - `/home/duman/TeamIndex/study/team_bench_results/strategy_selection_analysis/close_cases_w16_reps10/plots`
+- Wichtige Plot-Typen:
+  - `key_findings.pdf`: zentrale Zahlen, Gewinnerverteilung, Speedup-Histogramm, Margin-Histogramm
+  - `winner_map.pdf`: Gewinner je `T_rel`, Teamanzahl und Dimension
+  - `union_first_parallel_speedup_heatmap.pdf`: Speedup von Union First Parallel gegen Union First
+  - `relative_runtime_by_family.pdf`: wie weit jede Strategie von der besten Strategie der Familie entfernt ist
+  - `ise_vs_speedup.pdf`: zeigt, dass Union First Parallel bei `ISE=0` trotzdem hohe Speedups erreicht
+  - `workload_vs_speedup.pdf`: zeigt Speedup in Abhaengigkeit der getroffenen Zellen
+  - `winner_margin_variance.pdf`: zeigt, welche Siege varianzempfindlich sind
+- Interpretation fuer die Arbeit:
+  - Die Markdown-Reports bleiben als genaue Quelle erhalten
+  - Die PDFs sind besser geeignet fuer Thesis/Meeting, weil sie Muster und Unsicherheit direkt sichtbar machen
+  - Besonders wichtig sind `winner_map`, `union_first_parallel_speedup_heatmap`, `ise_vs_speedup` und `winner_margin_variance`
+
+## 15. Nicht-uniforme team_bench-Profile
+
+- Max' `team_bench`-Generator ist nicht auf uniforme Daten beschraenkt:
+  - `generate_indices(...)` akzeptiert pro Team eine beliebige Wahrscheinlichkeitsmatrix
+  - bisher war nur unser Wrapper [generate_team_bench_data.py](/home/duman/TeamIndex/study/generate_team_bench_data.py) uniform, weil dort immer `np.ones(...)` genutzt wurde
+- Der Wrapper kann jetzt kontrollierte nicht-uniforme Profile erzeugen:
+  - `uniform`: bisheriger Referenzfall
+  - `mixed_team_imbalance`: Teams haben deutlich unterschiedliche Query-Massen
+  - `cell_skew`: gleiche Query-Region, aber sehr ungleich volle Zellen/Posting Lists
+  - zusaetzlich vorbereitet: `query_hotspot` und `anti_query_hotspot`
+- Der Workflow schreibt `distribution_profile` und `distribution_strength` in Szenarien, CSVs und Analysen.
+  Alte Runs ohne diese Spalten werden in [analyze_strategy_selection.py](/home/duman/TeamIndex/study/analyze_strategy_selection.py) und
+  [strategy_selection_to_plots.py](/home/duman/TeamIndex/study/strategy_selection_to_plots.py) automatisch als `uniform` gelesen.
+- Neues lokales Pilot-Experiment:
+  - `study/experiments/team_bench_bins10_hit4_dims356_profiles_n200k.json`
+  - `N=200000`, `bins=10`, `hit=4`, Dimensionen `3D/5D/6D`, Teamanzahlen `2/3/4`
+  - Profile `uniform`, `mixed_team_imbalance`, `cell_skew`
+  - `81` Szenarien in `27` Familien
+  - Konfigurationsdatei ist lokal ignoriert, weil `study/experiments/*` per `.gitignore` nicht committed wird
+- Sicherheits-/Methodikpunkt:
+  - Bei 6D und kleinen `N` koennen sehr wenige Query-Treffer entstehen
+  - [generate_team_bench_data.py](/home/duman/TeamIndex/study/generate_team_bench_data.py) gibt deshalb eine Warnung aus, wenn die erwarteten Treffer im kleinsten Team unter der Schwelle liegen
+- Wichtiger Fix in [evaluation.py](/home/duman/TeamIndex/code/python/TeamIndex/evaluation.py):
+  - `_determine_groups(..., group_count == 1)` meldete bisher `min_group_size=max_group_size=1`
+  - korrekt ist die tatsaechliche Anzahl Blaetter in dieser einzigen Gruppe
+  - der Bug wurde durch `mixed_team_imbalance` sichtbar, weil `union_first_parallel` bei stark unbalancierten Teams ein kleines Team auf eine einzige Union-Gruppe reduzieren kann
+  - fuer aktuelle lokale Laeufe wurde derselbe Fix auch in der installierten venv-Kopie angewendet; langfristig sollte das Paket neu installiert werden
+- Smoke-Test:
+  - erzeugt wurde die Familie `teams2_dim3_mixed_team_imbalance` mit drei `T_rel`-Werten
+  - Query-Massen: grosses Team ca. `0.589`, kleines Team ca. `0.044`
+  - Ergebnisordner:
+    - `/media/data/duman/teamindex/team_bench/team_bench_bins10_hit4_dims356_profiles_n200k/teams2_dim3_mixed_team_imbalance`
+  - Mini-Benchmark mit einer Wiederholung:
+    - `/home/duman/TeamIndex/study/team_bench_results/team_bench_bins10_hit4_dims356_profiles_n200k/team_bench_bins10_hit4_dims356_profiles_n200k_w16_2026-06-08_00-08-53`
+    - `T_rel=0.10`: `union_first_parallel` gewinnt im Einzellauf
+    - `T_rel=0.60`: `union_first_parallel` gewinnt im Einzellauf
+    - `T_rel=0.85`: `dynamic_selective_expansion` gewinnt knapp im Einzellauf
+- Interpretation:
+  - nicht-uniforme Daten erzeugen tatsaechlich andere Situationen als die bisherigen uniformen Runs
+  - das macht `dynamic_selective_expansion` nicht automatisch gut, aber es ist nicht mehr nur eine tote Strategie
+  - fuer belastbare Aussagen brauchen diese Profilruns mehrere Wiederholungen und weitere Familien
+
+## 16. Venv-Reinstall und Thesis-Heatmap
+
+- Am `2026-06-08` wurde das virtuelle Environment neu erstellt:
+  - altes Environment: `venv.old/`
+  - neues Environment: `venv/`
+  - [`.gitignore`](/home/duman/TeamIndex/.gitignore) ignoriert jetzt auch `venv.old/`
+- Grund fuer den Reinstall:
+  - die Python-Quellen liegen unter [code/python/TeamIndex](/home/duman/TeamIndex/code/python/TeamIndex)
+  - die Study-Skripte importieren aber das installierte Paket aus `venv/lib/python3.12/site-packages/TeamIndex`
+  - Aenderungen an [evaluation.py](/home/duman/TeamIndex/code/python/TeamIndex/evaluation.py) werden deshalb erst durch Neuinstallation des Pakets im `venv` wirksam, sofern keine editable Installation genutzt wird
+- Geprueft:
+  - `venv/bin/python --version`: Python `3.12.3`
+  - `pip show TeamIndex`: Paket ist im neuen `venv` installiert
+  - importierte Datei: `/home/duman/TeamIndex/venv/lib/python3.12/site-packages/TeamIndex/evaluation.py`
+  - `_determine_groups(..., group_count == 1)` enthaelt dort den Fix mit `leaf_count`
+- Thesis:
+  - die Speedup-Heatmap aus `full_union_first_parallel_core` wurde nach `thesis/fig/ufp_speedup_heatmap.pdf` kopiert
+  - [Abschlussarbeit.tex](/home/duman/TeamIndex/thesis/Abschlussarbeit.tex) enthaelt jetzt eine Figure mit erklaerendem Text zu Union First Parallel
+  - `pdflatex` wurde zweimal erfolgreich ausgefuehrt
+  - Ausgabe: `thesis/Abschlussarbeit.pdf` mit `24` Seiten, ohne LaTeX-Warnungen zu undefinierten Referenzen

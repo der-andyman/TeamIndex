@@ -4,6 +4,7 @@ stats_and_configs
 
 # Python
 venv/
+venv.old/
 __pycache__/
 *.pyc
 

@@ -41,12 +41,82 @@ def parse_args():
     return parser.parse_args()
 
 
-def build_uniform_distributions(team_specs):
+def _normalize_distribution(weights):
+    total = float(weights.sum())
+    if total <= 0:
+        raise ValueError("Distribution has no positive probability mass.")
+    return weights / total
+
+
+def _small_query_corner(query_slices):
+    hotspot_slices = []
+    for slc in query_slices:
+        start = int(slc.start or 0)
+        stop = int(slc.stop)
+        width = max(1, stop - start)
+        hotspot_slices.append(slice(start, start + max(1, width // 4)))
+    return tuple(hotspot_slices)
+
+
+def _build_profile_distribution(shape, query_slices, profile, strength, team_position):
+    profile = profile.lower()
+    weights = np.ones(shape, dtype=np.float64)
+
+    if profile == "uniform":
+        return _normalize_distribution(weights)
+
+    if profile == "query_hotspot":
+        weights[query_slices] += strength
+        return _normalize_distribution(weights)
+
+    if profile == "anti_query_hotspot":
+        weights *= 1.0 + strength * 0.25
+        weights[query_slices] = 1.0
+        return _normalize_distribution(weights)
+
+    if profile == "cell_skew":
+        # Same query window, but very uneven cell/list cardinalities inside it.
+        weights[query_slices] += strength * 0.25
+        weights[_small_query_corner(query_slices)] += strength * 4.0
+        return _normalize_distribution(weights)
+
+    if profile == "mixed_team_imbalance":
+        if team_position == 0:
+            weights[query_slices] += strength * 2.0
+        elif team_position == 1:
+            weights *= 1.0 + strength * 0.05
+            weights[query_slices] = 1.0
+        elif team_position % 2 == 0:
+            weights[_small_query_corner(query_slices)] += strength * 4.0
+        else:
+            weights[query_slices] += strength * 0.5
+        return _normalize_distribution(weights)
+
+    raise ValueError(
+        f"Unknown distribution_profile '{profile}'. "
+        "Supported profiles: uniform, query_hotspot, anti_query_hotspot, "
+        "cell_skew, mixed_team_imbalance."
+    )
+
+
+def build_team_distributions(team_specs, query_slices, profile, strength):
     team_dists = {}
-    for team, shape in team_specs.items():
-        dist = np.ones(shape, dtype=float)
-        dist /= dist.sum()
+    for team_position, (team, shape) in enumerate(team_specs.items()):
+        dist = _build_profile_distribution(
+            shape=shape,
+            query_slices=query_slices[team],
+            profile=profile,
+            strength=strength,
+            team_position=team_position,
+        )
         team_dists[team] = dist
+        query_mass = float(dist[query_slices[team]].sum())
+        non_zero = dist[dist > 0]
+        skew_ratio = float(non_zero.max() / non_zero.min()) if len(non_zero) else 0.0
+        print(
+            f"  distribution {profile:>20} | team {team_position + 1}: {list(team)} | "
+            f"query_mass={query_mass:.6f} | cell_skew_ratio={skew_ratio:.2f}"
+        )
     return team_dists
 
 
@@ -75,14 +145,37 @@ def main():
         t_rel_values = [scenario["t_rel"] for scenario in family_scenarios]
         n = int(family_scenarios[0]["n"])
         worker_count = int(family_scenarios[0]["worker_count"])
+        distribution_profile = family_scenarios[0].get("distribution_profile", "uniform")
+        distribution_strength = float(family_scenarios[0].get("distribution_strength", 8.0))
+        min_query_hits_warning = int(family_scenarios[0].get("min_query_hits_warning", 500))
 
         print(f"\n=== Generating family {family_name} ===")
         print(f"Teams: {[list(team) for team in team_specs]}")
         print(f"Query: {query}")
         print(f"Output root: {destination_folder}")
         print(f"T_rel values: {t_rel_values}")
+        print(f"Distribution profile: {distribution_profile} (strength={distribution_strength:g})")
 
-        team_dists = build_uniform_distributions(team_specs)
+        team_dists = build_team_distributions(
+            team_specs=team_specs,
+            query_slices=query_slices,
+            profile=distribution_profile,
+            strength=distribution_strength,
+        )
+        min_query_mass = min(float(dist[query_slices[team]].sum()) for team, dist in team_dists.items())
+        expected_min_hits = min_query_mass * n
+        max_t_rel = max(t_rel_values)
+        expected_max_intersection = expected_min_hits * max_t_rel
+        if expected_min_hits < min_query_hits_warning:
+            print(
+                "  WARNING: sehr wenige erwartete Query-Treffer im kleinsten Team "
+                f"({expected_min_hits:.1f} < {min_query_hits_warning}). "
+                "Laufzeiten koennen stark varianzgepraegt sein."
+            )
+        print(
+            f"  smallest_team_query_hits≈{expected_min_hits:.1f}, "
+            f"intersection_hits_at_max_Trel≈{expected_max_intersection:.1f}"
+        )
         tb.generate_indices(
             N=n,
             T_rel_list=t_rel_values,

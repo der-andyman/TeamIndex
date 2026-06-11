@@ -28,6 +28,7 @@
     "strategies": [
       "baseline_union_first",
       "baseline_minimal_intersection",
+      "union_first_parallel",
       "current_handcrafted",
       "bounded_selective_expansion",
       "dynamic_selective_expansion"

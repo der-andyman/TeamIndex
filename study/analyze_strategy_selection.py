@@ -29,6 +29,10 @@ SUMMARY_FILE = "summary_by_variant.csv"
 RESULTS_FILE = "results.csv"
 SKIPPED_FILE = "skipped_variants.csv"
 
+VARIANT_ALIASES = {
+    "worker_balanced_union_grouping": "union_first_parallel",
+}
+
 PLAN_METRIC_COLUMNS = [
     "included_team_count_manual",
     "expanded_team_count_manual",
@@ -59,6 +63,8 @@ META_COLUMNS = [
     "team_count",
     "dimension",
     "t_rel",
+    "distribution_profile",
+    "distribution_strength",
     "n",
     "worker_count",
 ]
@@ -170,6 +176,22 @@ def add_run_columns(df: pd.DataFrame, run_dir: Path) -> pd.DataFrame:
     return df
 
 
+def normalize_variant_names(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if "variant" in df.columns:
+        df["variant"] = df["variant"].replace(VARIANT_ALIASES)
+    return df
+
+
+def ensure_distribution_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if "distribution_profile" not in df.columns:
+        df["distribution_profile"] = "uniform"
+    if "distribution_strength" not in df.columns:
+        df["distribution_strength"] = 0.0
+    return df
+
+
 def aggregate_plan_metrics(results_df: pd.DataFrame) -> pd.DataFrame:
     available_metrics = [col for col in PLAN_METRIC_COLUMNS if col in results_df.columns]
     group_cols = ["scenario_id", "variant"]
@@ -188,6 +210,8 @@ def build_skipped_outcomes(skipped_df: pd.DataFrame, run_dir: Path) -> pd.DataFr
             "team_count",
             "dimension",
             "t_rel",
+            "distribution_profile",
+            "distribution_strength",
             "worker_count",
             "variant",
         ]
@@ -214,8 +238,12 @@ def build_skipped_outcomes(skipped_df: pd.DataFrame, run_dir: Path) -> pd.DataFr
 
 
 def load_run(run_dir: Path) -> RunData:
-    results_df = add_run_columns(pd.read_csv(run_dir / RESULTS_FILE), run_dir)
-    summary_df = add_run_columns(pd.read_csv(run_dir / SUMMARY_FILE), run_dir)
+    results_df = ensure_distribution_columns(
+        normalize_variant_names(add_run_columns(pd.read_csv(run_dir / RESULTS_FILE), run_dir))
+    )
+    summary_df = ensure_distribution_columns(
+        normalize_variant_names(add_run_columns(pd.read_csv(run_dir / SUMMARY_FILE), run_dir))
+    )
 
     plan_df = aggregate_plan_metrics(results_df)
     outcomes = summary_df.merge(plan_df, on=["scenario_id", "variant"], how="left")
@@ -227,7 +255,7 @@ def load_run(run_dir: Path) -> RunData:
     skipped_path = run_dir / SKIPPED_FILE
     if skipped_path.exists() and skipped_path.stat().st_size > 0:
         try:
-            skipped_df = pd.read_csv(skipped_path)
+            skipped_df = ensure_distribution_columns(normalize_variant_names(pd.read_csv(skipped_path)))
         except pd.errors.EmptyDataError:
             skipped_df = pd.DataFrame()
         skipped_outcomes = build_skipped_outcomes(skipped_df, run_dir)
@@ -268,6 +296,8 @@ def winner_rows(outcomes: pd.DataFrame) -> pd.DataFrame:
             "team_count": winner.get("team_count", pd.NA),
             "dimension": winner.get("dimension", pd.NA),
             "t_rel": winner.get("t_rel", pd.NA),
+            "distribution_profile": winner.get("distribution_profile", "uniform"),
+            "distribution_strength": winner.get("distribution_strength", pd.NA),
             "n": winner.get("n", pd.NA),
             "worker_count": winner.get("worker_count", pd.NA),
             "winner_variant": winner["variant"],
@@ -295,7 +325,7 @@ def family_strategy_summary(outcomes: pd.DataFrame, winners: pd.DataFrame) -> pd
     win_counts = (
         winners
         .groupby(
-            ["experiment_name", "worker_count", "team_count", "dimension", "winner_variant"],
+            ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "winner_variant"],
             as_index=False,
         )
         .agg(win_count=("scenario_id", "count"))
@@ -308,7 +338,7 @@ def family_strategy_summary(outcomes: pd.DataFrame, winners: pd.DataFrame) -> pd
             & outcomes["runtime_ms_mean"].notna()
         ]
         .groupby(
-            ["experiment_name", "worker_count", "team_count", "dimension", "variant"],
+            ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "variant"],
             as_index=False,
         )
         .agg(
@@ -324,7 +354,7 @@ def family_strategy_summary(outcomes: pd.DataFrame, winners: pd.DataFrame) -> pd
     skipped_counts = (
         outcomes[outcomes["is_skipped"].fillna(False)]
         .groupby(
-            ["experiment_name", "worker_count", "team_count", "dimension", "variant"],
+            ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "variant"],
             as_index=False,
         )
         .agg(skipped_scenario_count=("scenario_id", "nunique"))
@@ -332,17 +362,17 @@ def family_strategy_summary(outcomes: pd.DataFrame, winners: pd.DataFrame) -> pd
 
     summary = runtime_summary.merge(
         win_counts,
-        on=["experiment_name", "worker_count", "team_count", "dimension", "variant"],
+        on=["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "variant"],
         how="left",
     )
     summary = summary.merge(
         skipped_counts,
-        on=["experiment_name", "worker_count", "team_count", "dimension", "variant"],
+        on=["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "variant"],
         how="left",
     )
     summary["win_count"] = summary["win_count"].fillna(0).astype(int)
     summary["skipped_scenario_count"] = summary["skipped_scenario_count"].fillna(0).astype(int)
-    return summary.sort_values(["experiment_name", "worker_count", "team_count", "dimension", "variant"])
+    return summary.sort_values(["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "variant"])
 
 
 def pivot_runtime(outcomes: pd.DataFrame) -> pd.DataFrame:
@@ -373,6 +403,8 @@ def compare_to_handcrafted(outcomes: pd.DataFrame) -> pd.DataFrame:
         "team_count",
         "dimension",
         "t_rel",
+        "distribution_profile",
+        "distribution_strength",
         "worker_count",
     ]
     meta = outcomes[meta_cols].drop_duplicates(["run_key", "scenario_id"])
@@ -412,6 +444,8 @@ def scenario_feature_table(outcomes: pd.DataFrame, winners: pd.DataFrame) -> pd.
         "team_count",
         "dimension",
         "t_rel",
+        "distribution_profile",
+        "distribution_strength",
         "n",
         "worker_count",
         "sum_union_cardinality",
@@ -461,14 +495,17 @@ def append_winner_map(lines: list[str], winners: pd.DataFrame):
     lines.append("")
     grouped = (
         winners
-        .groupby(["experiment_name", "worker_count", "team_count", "dimension", "winner_variant"], as_index=False)
+        .groupby(
+            ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "winner_variant"],
+            as_index=False,
+        )
         .agg(win_count=("scenario_id", "count"))
-        .sort_values(["experiment_name", "worker_count", "team_count", "dimension", "winner_variant"])
+        .sort_values(["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "winner_variant"])
     )
     for row in grouped.itertuples(index=False):
         lines.append(
             f"- `{row.experiment_name}`, w{int(row.worker_count)}, "
-            f"{int(row.team_count)}T-{int(row.dimension)}D: "
+            f"{int(row.team_count)}T-{int(row.dimension)}D, Profil `{row.distribution_profile}`: "
             f"`{row.winner_variant}` gewinnt {int(row.win_count)} Szenarien"
         )
     lines.append("")
@@ -514,12 +551,12 @@ def append_plan_signal(lines: list[str], family_summary: pd.DataFrame):
     lines.append("## 3. Plan-Signale")
     lines.append("")
     compact = family_summary.sort_values(
-        ["experiment_name", "worker_count", "team_count", "dimension", "runtime_ms_mean"]
+        ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile", "runtime_ms_mean"]
     )
     for row in compact.itertuples(index=False):
         lines.append(
             f"- `{row.experiment_name}`, w{int(row.worker_count)}, "
-            f"{int(row.team_count)}T-{int(row.dimension)}D, `{row.variant}`: "
+            f"{int(row.team_count)}T-{int(row.dimension)}D, Profil `{row.distribution_profile}`, `{row.variant}`: "
             f"Wins={int(row.win_count)}/{int(row.scenario_count)}, "
             f"Runtime={format_float(row.runtime_ms_mean)} ms, "
             f"ISE={format_float(row.ise_estimate_mean, 1)}, "
@@ -541,18 +578,23 @@ def append_handcrafted_comparison(lines: list[str], comparison: pd.DataFrame):
         col for col in comparison.columns
         if col.endswith("_runtime_ratio_vs_handcrafted")
     ]
-    summary = comparison.groupby(["experiment_name", "worker_count", "team_count", "dimension"], as_index=False).agg(
+    summary = comparison.groupby(
+        ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile"],
+        as_index=False,
+    ).agg(
         **{col: (col, "mean") for col in ratio_cols}
     )
     lines.append("Interpretation: Wert > 1 bedeutet, dass die Vergleichsstrategie langsamer ist als `current_handcrafted`.")
-    for row in summary.sort_values(["experiment_name", "worker_count", "team_count", "dimension"]).itertuples(index=False):
+    for row in summary.sort_values(
+        ["experiment_name", "worker_count", "team_count", "dimension", "distribution_profile"]
+    ).itertuples(index=False):
         values = []
         for col in ratio_cols:
             label = col.replace("_runtime_ratio_vs_handcrafted", "")
             values.append(f"{label}={format_float(getattr(row, col))}")
         lines.append(
             f"- `{row.experiment_name}`, w{int(row.worker_count)}, "
-            f"{int(row.team_count)}T-{int(row.dimension)}D: "
+            f"{int(row.team_count)}T-{int(row.dimension)}D, Profil `{row.distribution_profile}`: "
             + ", ".join(values)
         )
     lines.append("")
@@ -561,6 +603,37 @@ def append_handcrafted_comparison(lines: list[str], comparison: pd.DataFrame):
 def append_strategy_gaps(lines: list[str], outcomes: pd.DataFrame, comparison: pd.DataFrame, winners: pd.DataFrame):
     lines.append("## 5. Was uns das fuer neue Strategien sagt")
     lines.append("")
+
+    runtime_pivot = pivot_runtime(outcomes)
+    if (
+        "union_first_parallel" in runtime_pivot.columns
+        and "baseline_union_first" in runtime_pivot.columns
+    ):
+        worker_ratios = (
+            runtime_pivot["baseline_union_first"]
+            / runtime_pivot["union_first_parallel"]
+        ).dropna()
+        useful_worker = worker_ratios[worker_ratios > 1.10]
+        if not worker_ratios.empty:
+            lines.append(
+                f"- `union_first_parallel` testet physische Parallelitaet ohne logische Expansion. "
+                f"Gegenueber Union First ist diese Variante in {len(useful_worker)}/{len(worker_ratios)} "
+                f"Faellen mindestens 10 Prozent schneller; der mittlere Faktor liegt bei "
+                f"{worker_ratios.mean():.3f}."
+            )
+        if "current_handcrafted" in runtime_pivot.columns:
+            worker_vs_handcrafted = (
+                runtime_pivot["current_handcrafted"]
+                / runtime_pivot["union_first_parallel"]
+            ).dropna()
+            worker_better = worker_vs_handcrafted[worker_vs_handcrafted > 1.02]
+            if not worker_vs_handcrafted.empty:
+                lines.append(
+                    f"- In {len(worker_better)}/{len(worker_vs_handcrafted)} Faellen ist "
+                    "`union_first_parallel` mindestens 2 Prozent schneller als "
+                    "`current_handcrafted`. Das zeigt, dass mehr ISEs nicht die einzige "
+                    "Quelle fuer Parallelitaet sind."
+                )
 
     if not comparison.empty and "dynamic_selective_expansion_runtime_ratio_vs_handcrafted" in comparison.columns:
         dynamic_bad = comparison[
@@ -602,7 +675,7 @@ def append_strategy_gaps(lines: list[str], outcomes: pd.DataFrame, comparison: p
     lines.append("")
     lines.append("Erster Regelentwurf fuer die spaetere Strategiewahl:")
     lines.append("- 2D: als Kontroll-/Randfall behandeln; nur dann hart entscheiden, wenn Margin und Varianz klar sind.")
-    lines.append("- 3D bis 5D mit vielen getroffenen Zellen: eine gebremste Ein-Team-Expansion ist aktuell der staerkste Kandidat.")
+    lines.append("- 3D bis 5D mit vielen getroffenen Zellen: gebremste Ein-Team-Expansion und Union First Parallel sind beide starke Kandidaten.")
     lines.append("- Wenn eine Strategie sehr hohe ISE Counts erzeugt, vor der Ausfuehrung pruefen und notfalls verwerfen.")
     lines.append("- Wenn Union First knapp oder klar gewinnt, nicht expandieren; Expansion ist dann nur Overhead.")
     lines.append("")

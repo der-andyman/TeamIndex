@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 from study_paths import TEAM_BENCH_DATA_ROOT, TEAM_BENCH_EXPERIMENTS_DIR, TEAM_BENCH_RESULTS_ROOT
@@ -62,9 +63,23 @@ def _t_rel_token(t_rel: float) -> str:
     return str(t_rel).replace(".", "")
 
 
-def _query_note(team_count: int, dimension: int, t_rel: float) -> str:
+def _profile_token(profile: str) -> str:
+    token = re.sub(r"[^a-zA-Z0-9]+", "_", profile.strip().lower()).strip("_")
+    return token or "uniform"
+
+
+def _distribution_profiles(defaults: dict[str, Any]) -> list[str]:
+    if "distribution_profiles" in defaults:
+        return [str(profile) for profile in defaults["distribution_profiles"]]
+    return [str(defaults.get("distribution_profile", "uniform"))]
+
+
+def _query_note(team_count: int, dimension: int, t_rel: float, distribution_profile: str = "uniform") -> str:
+    profile_note = ""
+    if distribution_profile != "uniform":
+        profile_note = f", Profil={distribution_profile}"
     return (
-        f"{team_count} Teams, {dimension}D, T_rel={t_rel:.2f}: "
+        f"{team_count} Teams, {dimension}D, T_rel={t_rel:.2f}{profile_note}: "
         f"kontrollierte synthetische Query mit disjunkten Teams"
     )
 
@@ -84,6 +99,10 @@ def expand_experiment_scenarios(config: dict[str, Any]) -> list[dict[str, Any]]:
     repetitions = int(defaults["repetitions"])
     baseline_variant = defaults["baseline_variant"]
     strategies = list(defaults["strategies"])
+    distribution_profiles = _distribution_profiles(defaults)
+    distribution_strength = float(defaults.get("distribution_strength", 8.0))
+    min_query_hits_warning = int(defaults.get("min_query_hits_warning", 500))
+    include_profile_in_name = len(distribution_profiles) > 1 or distribution_profiles[0] != "uniform"
 
     scenarios: list[dict[str, Any]] = []
     for team_count in defaults["team_counts"]:
@@ -96,43 +115,63 @@ def expand_experiment_scenarios(config: dict[str, Any]) -> list[dict[str, Any]]:
                 value_domain_max=value_domain_max,
                 attribute_prefix=attribute_prefix,
             )
-            family_name = f"teams{int(team_count)}_dim{int(dimension)}"
-            family_output_root = output_root / family_name
-
-            for t_rel in defaults["t_rel_values"]:
-                scenario_id = f"tb_{int(team_count)}t_{int(dimension)}d_t{int(round(float(t_rel) * 100)):03d}"
-                t_rel_folder = f"selectivity_Trel{_t_rel_token(float(t_rel))}_N{n}"
-                scenario_data_root = family_output_root / t_rel_folder
-                scenarios.append(
-                    {
-                        "experiment_name": experiment_name,
-                        "scenario_id": scenario_id,
-                        "family_name": family_name,
-                        "team_count": int(team_count),
-                        "dimension": int(dimension),
-                        "t_rel": float(t_rel),
-                        "n": n,
-                        "bins_per_dimension": bins_per_dimension,
-                        "selected_bins_per_dimension": selected_bins_per_dimension,
-                        "value_domain_max": value_domain_max,
-                        "worker_count": worker_count,
-                        "repetitions": repetitions,
-                        "baseline_variant": baseline_variant,
-                        "strategies": strategies,
-                        "query": layout["query"],
-                        "query_note": _query_note(int(team_count), int(dimension), float(t_rel)),
-                        "attributes": layout["attributes"],
-                        "teams": [list(team) for team in layout["teams"]],
-                        "quantiles": layout["quantiles"],
-                        "query_slices": {
-                            "-".join(team): [[slc.start, slc.stop, slc.step] for slc in slices]
-                            for team, slices in layout["query_slices"].items()
-                        },
-                        "data_root": str(scenario_data_root),
-                        "index_config_path": str(scenario_data_root / "index.json"),
-                        "benchmark_output_root": str(benchmark_output_root),
-                    }
+            for distribution_profile in distribution_profiles:
+                profile_token = _profile_token(distribution_profile)
+                base_family_name = f"teams{int(team_count)}_dim{int(dimension)}"
+                family_name = (
+                    f"{base_family_name}_{profile_token}"
+                    if include_profile_in_name
+                    else base_family_name
                 )
+                family_output_root = output_root / family_name
+
+                for t_rel in defaults["t_rel_values"]:
+                    base_scenario_id = f"tb_{int(team_count)}t_{int(dimension)}d_t{int(round(float(t_rel) * 100)):03d}"
+                    scenario_id = (
+                        f"{base_scenario_id}_{profile_token}"
+                        if include_profile_in_name
+                        else base_scenario_id
+                    )
+                    t_rel_folder = f"selectivity_Trel{_t_rel_token(float(t_rel))}_N{n}"
+                    scenario_data_root = family_output_root / t_rel_folder
+                    scenarios.append(
+                        {
+                            "experiment_name": experiment_name,
+                            "scenario_id": scenario_id,
+                            "family_name": family_name,
+                            "team_count": int(team_count),
+                            "dimension": int(dimension),
+                            "t_rel": float(t_rel),
+                            "n": n,
+                            "bins_per_dimension": bins_per_dimension,
+                            "selected_bins_per_dimension": selected_bins_per_dimension,
+                            "value_domain_max": value_domain_max,
+                            "worker_count": worker_count,
+                            "repetitions": repetitions,
+                            "baseline_variant": baseline_variant,
+                            "strategies": strategies,
+                            "distribution_profile": distribution_profile,
+                            "distribution_strength": distribution_strength,
+                            "min_query_hits_warning": min_query_hits_warning,
+                            "query": layout["query"],
+                            "query_note": _query_note(
+                                int(team_count),
+                                int(dimension),
+                                float(t_rel),
+                                distribution_profile,
+                            ),
+                            "attributes": layout["attributes"],
+                            "teams": [list(team) for team in layout["teams"]],
+                            "quantiles": layout["quantiles"],
+                            "query_slices": {
+                                "-".join(team): [[slc.start, slc.stop, slc.step] for slc in slices]
+                                for team, slices in layout["query_slices"].items()
+                            },
+                            "data_root": str(scenario_data_root),
+                            "index_config_path": str(scenario_data_root / "index.json"),
+                            "benchmark_output_root": str(benchmark_output_root),
+                        }
+                    )
     return scenarios
 
 
