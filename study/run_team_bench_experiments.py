@@ -106,6 +106,41 @@ def create_run_output_dir(experiment_root: Path, experiment_name: str, worker_co
     return run_dir
 
 
+def compute_bin_geometry(scenario: dict) -> dict[str, int | float]:
+    bins_per_dimension = int(scenario["bins_per_dimension"])
+    selected_bins_per_dimension = int(scenario["selected_bins_per_dimension"])
+    dimension = int(scenario["dimension"])
+    team_count = int(scenario["team_count"])
+    index_bin_cells_per_team = bins_per_dimension ** dimension
+    selected_bin_cells_per_team = selected_bins_per_dimension ** dimension
+    total_index_bin_cells = team_count * index_bin_cells_per_team
+    total_selected_bin_cells_nominal = team_count * selected_bin_cells_per_team
+    return {
+        "bins_per_dimension": bins_per_dimension,
+        "selected_bins_per_dimension": selected_bins_per_dimension,
+        "index_bin_cells_per_team": index_bin_cells_per_team,
+        "selected_bin_cells_per_team": selected_bin_cells_per_team,
+        "total_index_bin_cells": total_index_bin_cells,
+        "total_selected_bin_cells_nominal": total_selected_bin_cells_nominal,
+        "selected_bin_cell_fraction": (
+            total_selected_bin_cells_nominal / total_index_bin_cells
+            if total_index_bin_cells else 0.0
+        ),
+    }
+
+
+def print_bin_geometry(bin_geometry: dict[str, int | float]):
+    print(
+        "Bin-Geometrie: "
+        f"{bin_geometry['bins_per_dimension']} Bins/Dimension, "
+        f"{bin_geometry['selected_bins_per_dimension']} Query-Bins/Dimension, "
+        f"{bin_geometry['selected_bin_cells_per_team']:,} getroffene Zellen pro Team, "
+        f"{bin_geometry['total_selected_bin_cells_nominal']:,} getroffene Zellen gesamt "
+        f"von {bin_geometry['total_index_bin_cells']:,} Index-Zellen "
+        f"({bin_geometry['selected_bin_cell_fraction']:.2%})"
+    )
+
+
 def write_outputs(output_dir: Path, result_rows, mopts_rows, baseline_variant: str, skipped_rows=None):
     results_df = pd.DataFrame(result_rows)
     mopts_df = pd.DataFrame(mopts_rows)
@@ -147,6 +182,15 @@ def write_outputs(output_dir: Path, result_rows, mopts_rows, baseline_variant: s
             result_size_mean=("result_size", "mean"),
             ise_count_mean=("ise_count", "mean"),
             total_request_count_mean=("total_request_count", "mean"),
+            total_selected_bin_cells_mean=("total_selected_bin_cells", "mean"),
+            total_selected_attribute_bins_mean=("total_selected_attribute_bins", "mean"),
+            bins_per_dimension=("bins_per_dimension", "first"),
+            selected_bins_per_dimension=("selected_bins_per_dimension", "first"),
+            index_bin_cells_per_team=("index_bin_cells_per_team", "first"),
+            selected_bin_cells_per_team=("selected_bin_cells_per_team", "first"),
+            total_index_bin_cells=("total_index_bin_cells", "first"),
+            total_selected_bin_cells_nominal=("total_selected_bin_cells_nominal", "first"),
+            selected_bin_cell_fraction=("selected_bin_cell_fraction", "first"),
         )
     )
 
@@ -247,6 +291,8 @@ def main():
         print(f"\n=== [{scenario_index}/{len(scenarios)}] {scenario_id} ===")
         print(scenario["query"])
         print(scenario["query_note"])
+        bin_geometry = compute_bin_geometry(scenario)
+        print_bin_geometry(bin_geometry)
 
         index = eva.TeamIndex(index_config_path)
         # team_bench-Indizes enthalten bewusst nur die Daten innerhalb der
@@ -321,6 +367,7 @@ def main():
                         "variant": variant_name,
                         "variant_description": variant["description"],
                         "repetition": repetition,
+                        **bin_geometry,
                         **query_structure,
                         "worker_count": runtime_config["worker_count"],
                         "result_size": len(result_ids),
@@ -348,7 +395,10 @@ def main():
                 )
                 print(
                     f"    {variant_name}: runtime={runtime_stats.executor_runtime / 1_000_000:.3f} ms, "
-                    f"result={len(result_ids)}, ise={global_info['ise_count']}"
+                    f"result={len(result_ids)}, ise={global_info['ise_count']}, "
+                    f"bins={query_structure['total_selected_bin_cells']} cells "
+                    f"({query_structure['total_selected_attribute_bins']} attr-bins), "
+                    f"requests={global_info['total_request_count']}"
                 )
 
             write_outputs(output_dir, result_rows, mopts_rows, scenario["baseline_variant"], skipped_rows)

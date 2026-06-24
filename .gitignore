@@ -32,10 +32,12 @@ study/__pycache__/
 MOPTS_STRATEGY_RESULT_NOTES.md
 SESSION_NOTES.md
 MAX_*.md
+MAX_*.txt
 study/export_thesis_tables.py
 
 # Lokaler Thesis-Ordner
 thesis/
+thesis_cleaned/
 
 # Lokal erstellte Experimente auf Repo-Root-Ebene
 /experiments/

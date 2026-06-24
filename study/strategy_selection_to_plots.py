@@ -45,7 +45,7 @@ VARIANT_LABELS = {
     "baseline_union_first": "Union First",
     "union_first_parallel": "UF Parallel",
     "current_handcrafted": "Handcrafted",
-    "bounded_selective_expansion": "Bounded Exp.",
+    "bounded_selective_expansion": "Begr. Expansion",
     "dynamic_selective_expansion": "Dynamic",
     "baseline_minimal_intersection": "Minimal Int.",
     "expand_all_adaptive_grouping": "Expand All",
@@ -144,7 +144,7 @@ def variant_short(variant: str) -> str:
         "baseline_union_first": "UF",
         "union_first_parallel": "UFP",
         "current_handcrafted": "HC",
-        "bounded_selective_expansion": "BSE",
+        "bounded_selective_expansion": "Bound.",
         "dynamic_selective_expansion": "DYN",
         "baseline_minimal_intersection": "MI",
         "expand_all_adaptive_grouping": "EAG",
@@ -186,7 +186,6 @@ def family_key(row) -> tuple:
 
 def family_label(row) -> str:
     return (
-        f"{experiment_scope(row.experiment_name)} | "
         f"{int(row.team_count)}T-{int(row.dimension)}D | "
         f"{profile_label(getattr(row, 'distribution_profile', 'uniform'))}"
     )
@@ -199,6 +198,51 @@ def scenario_label(row) -> str:
         f"{profile_label(getattr(row, 'distribution_profile', 'uniform'))} "
         f"T={float(row.t_rel):.2f}"
     )
+
+
+def scope_note(df: pd.DataFrame) -> str:
+    if df.empty:
+        return ""
+    parts: list[str] = []
+    for column, label in [
+        ("experiment_name", "Experiment"),
+        ("team_count", "Teams"),
+        ("dimension", "Dimension"),
+        ("distribution_profile", "Profil"),
+        ("worker_count", "Worker"),
+        ("n", "N"),
+    ]:
+        if column not in df.columns:
+            continue
+        values = sorted(value for value in df[column].dropna().unique())
+        if len(values) != 1:
+            continue
+        value = values[0]
+        if column == "experiment_name":
+            value = experiment_scope(str(value))
+        elif column == "distribution_profile":
+            value = profile_label(str(value))
+        elif column == "team_count":
+            value = f"{int(value)}"
+        elif column == "dimension":
+            value = f"{int(value)}D"
+        elif column in {"worker_count", "n"}:
+            value = f"{int(value)}"
+        parts.append(f"{label}: {value}")
+    return " | ".join(parts)
+
+
+def compact_scenario_label(row, df: pd.DataFrame) -> str:
+    pieces: list[str] = []
+    for column, formatter in [
+        ("team_count", lambda value: f"{int(value)}T"),
+        ("dimension", lambda value: f"{int(value)}D"),
+        ("distribution_profile", lambda value: profile_label(str(value))),
+    ]:
+        if column in df.columns and df[column].dropna().nunique() > 1:
+            pieces.append(formatter(getattr(row, column)))
+    pieces.append(f"T={float(row.t_rel):.2f}")
+    return " | ".join(pieces)
 
 
 def scenario_sort_cols(df: pd.DataFrame) -> list[str]:
@@ -273,7 +317,7 @@ def plot_key_findings(data: AnalysisData, output_path: Path, dashboard: PdfPages
         ("Szenarien", f"{total_winners}"),
         ("UF Parallel >= 10% schneller als UF", f"{int((uf_speedups > 1.10).sum())}/{len(uf_speedups)}"),
         ("Mittlerer Faktor vs. UF", f"{uf_speedups.mean():.3f}x" if not uf_speedups.empty else "n/a"),
-        ("UF Parallel >= 2% schneller als HC", f"{int((hc_speedups > 1.02).sum())}/{len(hc_speedups)}" if not hc_speedups.empty else "n/a"),
+        ("UF Parallel > Handcrafted um 2%", f"{int((hc_speedups > 1.02).sum())}/{len(hc_speedups)}" if not hc_speedups.empty else "n/a"),
         ("Varianz-klarer Gewinner", f"{variance_clear_count}/{total_winners}"),
     ]
     y = 0.9
@@ -599,54 +643,203 @@ def plot_workload_vs_speedup(data: AnalysisData, output_path: Path, dashboard: P
 
 
 def plot_margin_variance(data: AnalysisData, output_path: Path, dashboard: PdfPages | None):
-    winners = data.winners.copy()
-    winners = winners.sort_values("winner_margin", ascending=True).reset_index(drop=True)
-    winners["label"] = winners.apply(scenario_label, axis=1)
-    winners["winner_gap_percent"] = (winners["winner_margin"] - 1.0) * 100.0
-    colors = np.where(winners["variance_clear"].fillna(False), "#2ca02c", "#c49a00")
+    df = data.outcomes.copy()
+    df = df[(~df["is_skipped"].fillna(False)) & df["runtime_ms_mean"].notna()]
+    if df.empty or not {"t_rel", "variant", "runtime_ms_mean", "runtime_ms_std"}.issubset(df.columns):
+        return None
 
-    fig, ax = plt.subplots(figsize=(12, max(6, len(winners) * 0.25)))
-    y = np.arange(len(winners))
-    ax.barh(y, winners["winner_gap_percent"], color=colors, alpha=0.9)
-    ax.axvline(0.0, color="#333333", linewidth=1.0)
-    ax.axvline(5.0, color="#b23a48", linewidth=1.1, linestyle="--", label="5% Abstand")
-    ax.set_yticks(y)
-    ax.set_yticklabels(winners["label"], fontsize=8)
-    ax.invert_yaxis()
-    ax.set_xlabel("Abstand Runner-up zu Gewinner [%]")
-    ax.set_title("Wie belastbar sind die Gewinner?\nGruen = Abstand groesser als beide Standardabweichungen, Gelb = varianzempfindlich")
-    for idx, row in winners.iterrows():
-        ax.text(
-            float(row.winner_gap_percent) + 0.25,
-            idx,
-            f"{variant_short(row.winner_variant)}",
-            va="center",
-            fontsize=8,
+    t_rel_values = sorted_t_rel_values(df)
+    variants = variants_in_order(df["variant"].unique())
+    x = np.arange(len(t_rel_values))
+    width = min(0.16, 0.78 / max(1, len(variants)))
+    offsets = (np.arange(len(variants)) - (len(variants) - 1) / 2) * width
+
+    fig, ax = plt.subplots(figsize=(12.0, 6.4))
+    for idx, variant in enumerate(variants):
+        subset = df[df["variant"] == variant]
+        means = []
+        stds = []
+        for t_rel in t_rel_values:
+            row = subset[subset["t_rel"] == t_rel]
+            if row.empty:
+                means.append(np.nan)
+                stds.append(0.0)
+                continue
+            means.append(float(row["runtime_ms_mean"].iloc[0]))
+            stds.append(float(row["runtime_ms_std"].fillna(0.0).iloc[0]))
+
+        ax.bar(
+            x + offsets[idx],
+            means,
+            width=width * 0.92,
+            yerr=stds,
+            capsize=3,
+            label=variant_label(variant),
+            color=VARIANT_COLORS.get(variant, "#777777"),
+            alpha=0.9,
+            error_kw={"linewidth": 1.0},
         )
-    ax.legend(loc="lower right")
-    ax.grid(axis="x", linestyle=":", alpha=0.35)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"T={value:.2f}" for value in t_rel_values])
+    ax.set_xlabel("T_rel")
+    ax.set_ylabel("Mittlere Laufzeit [ms]")
+    ax.set_title("Laufzeitvergleich mit Messstreuung\nFehlerbalken zeigen die Standardabweichung ueber die Wiederholungen")
+    ax.grid(axis="y", linestyle=":", alpha=0.35)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0))
     fig.tight_layout()
+    return finish_figure(fig, output_path, dashboard)
+
+
+def format_int_de(value: float) -> str:
+    return f"{int(round(float(value))):,}".replace(",", ".")
+
+
+def load_per_team_union_sizes(data: AnalysisData) -> pd.DataFrame:
+    if "run_dir" not in data.outcomes.columns:
+        return pd.DataFrame()
+
+    frames: list[pd.DataFrame] = []
+    for run_dir in data.outcomes["run_dir"].dropna().drop_duplicates():
+        path = Path(str(run_dir)) / "mopts_per_team.csv"
+        if not path.exists():
+            continue
+        try:
+            df = pd.read_csv(
+                path,
+                usecols=["query_name", "variant", "team", "union_cardinality"],
+            )
+        except Exception:
+            continue
+        df = df[df["variant"] == "baseline_union_first"].copy()
+        if df.empty:
+            continue
+        df = df.rename(columns={"query_name": "scenario_id"})
+        df = df.drop_duplicates(["scenario_id", "team", "union_cardinality"])
+        frames.append(df[["scenario_id", "team", "union_cardinality"]])
+
+    if not frames:
+        return pd.DataFrame()
+
+    team_sizes = pd.concat(frames, ignore_index=True).drop_duplicates()
+    meta_cols = [
+        col
+        for col in [
+            "scenario_id",
+            "experiment_name",
+            "team_count",
+            "dimension",
+            "distribution_profile",
+            "t_rel",
+            "worker_count",
+            "n",
+        ]
+        if col in data.scenario_features.columns
+    ]
+    meta = data.scenario_features[meta_cols].drop_duplicates("scenario_id")
+    return team_sizes.merge(meta, on="scenario_id", how="left")
+
+
+def plot_team_imbalance(data: AnalysisData, output_path: Path, dashboard: PdfPages | None):
+    team_sizes = load_per_team_union_sizes(data)
+    if team_sizes.empty:
+        return None
+
+    team_sizes = team_sizes.sort_values(["t_rel", "union_cardinality"]).reset_index(drop=True)
+    scenarios = (
+        team_sizes[["scenario_id", "t_rel"]]
+        .drop_duplicates("scenario_id")
+        .sort_values("t_rel")
+        .reset_index(drop=True)
+    )
+    scenario_pos = {scenario_id: idx for idx, scenario_id in enumerate(scenarios["scenario_id"])}
+
+    fig, ax = plt.subplots(figsize=(11.5, max(6.2, len(scenarios) * 1.15)))
+    rank_colors = ["#93c5fd", "#3b82f6", "#1e3a8a"]
+    rank_labels = ["kleinstes Team-Ergebnis", "mittleres Team-Ergebnis", "groesstes Team-Ergebnis"]
+    bar_height = 0.18
+    right_edge = 0.0
+
+    for scenario_id, subset in team_sizes.groupby("scenario_id", sort=False):
+        base_y = scenario_pos[scenario_id]
+        subset = subset.sort_values("union_cardinality")
+        count = len(subset)
+        offsets = np.linspace(-(count - 1) / 2, (count - 1) / 2, count) * (bar_height + 0.04)
+        values = subset["union_cardinality"].astype(float).to_numpy()
+        min_size = float(values.min())
+        max_size = float(values.max())
+        imbalance = max_size / max(1.0, min_size)
+        right_edge = max(right_edge, max_size)
+
+        for rank, ((_, row), offset) in enumerate(zip(subset.iterrows(), offsets)):
+            y = base_y + offset
+            value = float(row["union_cardinality"])
+            label = rank_labels[rank] if rank < len(rank_labels) else f"Team {rank + 1}"
+            ax.barh(
+                y,
+                value,
+                height=bar_height,
+                color=rank_colors[min(rank, len(rank_colors) - 1)],
+                alpha=0.9,
+                label=label if base_y == 0 else None,
+            )
+            ax.text(value * 1.08, y, format_int_de(value), va="center", fontsize=8)
+
+        ax.text(
+            max_size * 1.55,
+            base_y,
+            f"{imbalance:.1f}x = {format_int_de(max_size)} / {format_int_de(min_size)}",
+            va="center",
+            fontsize=9,
+            color="#111111",
+        )
+
+    ax.set_xscale("log", base=10)
+    ax.set_xlim(left=max(1, team_sizes["union_cardinality"].min() * 0.55), right=right_edge * 8)
+    ax.set_yticks(np.arange(len(scenarios)))
+    ax.set_yticklabels([f"T={float(row.t_rel):.2f}" for row in scenarios.itertuples(index=False)], fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlabel("Groesse der Team-Union nach Anwendung der Query [IDs, log-Skala]")
+    ax.set_title(
+        "Teamgroessen nach der Query\n"
+        "Imbalance = groesstes Team-Ergebnis / kleinstes Team-Ergebnis"
+    )
+    ax.grid(axis="x", linestyle=":", alpha=0.35)
+    ax.legend(title="Balken", loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8)
+    ax.text(
+        0.0,
+        -0.14,
+        "Lesart: Ein hoher Faktor bedeutet, dass ein kleines Team viel staerker filtert als ein grosses Team.",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=9,
+        color="#333333",
+    )
+    fig.tight_layout(rect=[0, 0.05, 1, 1])
     return finish_figure(fig, output_path, dashboard)
 
 
 def generate_plots(data: AnalysisData, output_dir: Path) -> list[Path]:
     plot_paths: list[Path] = []
-    dashboard_path = output_dir / "strategy_selection_dashboard.pdf"
-    with PdfPages(dashboard_path) as dashboard:
-        for plotter, filename in [
-            (plot_key_findings, "key_findings.pdf"),
-            (plot_winner_map, "winner_map.pdf"),
-            (plot_union_first_parallel_speedup_heatmap, "union_first_parallel_speedup_heatmap.pdf"),
-            (plot_win_counts, "win_counts_by_family.pdf"),
-            (plot_relative_runtime_by_family, "relative_runtime_by_family.pdf"),
-            (plot_ise_vs_speedup, "ise_vs_speedup.pdf"),
-            (plot_workload_vs_speedup, "workload_vs_speedup.pdf"),
-            (plot_margin_variance, "winner_margin_variance.pdf"),
-        ]:
-            result = plotter(data, output_dir / filename, dashboard)
-            if result is not None:
-                plot_paths.append(result)
-    plot_paths.insert(0, dashboard_path)
+    stale_dashboard = output_dir / "strategy_selection_dashboard.pdf"
+    if stale_dashboard.exists():
+        stale_dashboard.unlink()
+
+    for plotter, filename in [
+        (plot_key_findings, "key_findings.pdf"),
+        (plot_winner_map, "winner_map.pdf"),
+        (plot_union_first_parallel_speedup_heatmap, "union_first_parallel_speedup_heatmap.pdf"),
+        (plot_win_counts, "win_counts_by_family.pdf"),
+        (plot_relative_runtime_by_family, "relative_runtime_by_family.pdf"),
+        (plot_ise_vs_speedup, "ise_vs_speedup.pdf"),
+        (plot_workload_vs_speedup, "workload_vs_speedup.pdf"),
+        (plot_team_imbalance, "team_imbalance.pdf"),
+        (plot_margin_variance, "winner_margin_variance.pdf"),
+    ]:
+        result = plotter(data, output_dir / filename, None)
+        if result is not None:
+            plot_paths.append(result)
     return plot_paths
 
 

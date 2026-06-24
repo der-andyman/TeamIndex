@@ -38,6 +38,12 @@ def parse_args():
         default=[],
         help="Nur Familien ausfuehren, deren Name dieses Teilstueck enthaelt. Mehrfach nutzbar.",
     )
+    parser.add_argument(
+        "--scenario-filter",
+        action="append",
+        default=[],
+        help="Nur Szenarien ausfuehren, deren ID dieses Teilstueck enthaelt. Mehrfach nutzbar.",
+    )
     return parser.parse_args()
 
 
@@ -115,7 +121,8 @@ def build_team_distributions(team_specs, query_slices, profile, strength):
         skew_ratio = float(non_zero.max() / non_zero.min()) if len(non_zero) else 0.0
         print(
             f"  distribution {profile:>20} | team {team_position + 1}: {list(team)} | "
-            f"query_mass={query_mass:.6f} | cell_skew_ratio={skew_ratio:.2f}"
+            f"query_mass={query_mass:.6f} | cell_skew_ratio={skew_ratio:.2f}",
+            flush=True,
         )
     return team_dists
 
@@ -124,11 +131,18 @@ def main():
     args = parse_args()
     config = load_experiment_config(args.config)
     scenarios = expand_experiment_scenarios(config)
+    if args.scenario_filter:
+        scenarios = [
+            scenario for scenario in scenarios
+            if any(token in scenario["scenario_id"] for token in args.scenario_filter)
+        ]
+    if not scenarios:
+        raise RuntimeError("No team_bench scenarios matched the current filters.")
     manifest_path = scenario_manifest_path(config)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("w", encoding="utf-8") as fh:
         json.dump(scenarios, fh, indent=2)
-    print(f"Expanded scenario manifest written to: {manifest_path}")
+    print(f"Expanded scenario manifest written to: {manifest_path}", flush=True)
 
     grouped = group_scenarios_by_family(scenarios)
     for family_name, family_scenarios in sorted(grouped.items()):
@@ -149,12 +163,33 @@ def main():
         distribution_strength = float(family_scenarios[0].get("distribution_strength", 8.0))
         min_query_hits_warning = int(family_scenarios[0].get("min_query_hits_warning", 500))
 
-        print(f"\n=== Generating family {family_name} ===")
-        print(f"Teams: {[list(team) for team in team_specs]}")
-        print(f"Query: {query}")
-        print(f"Output root: {destination_folder}")
-        print(f"T_rel values: {t_rel_values}")
-        print(f"Distribution profile: {distribution_profile} (strength={distribution_strength:g})")
+        print(f"\n=== Generating family {family_name} ===", flush=True)
+        print(f"Teams: {[list(team) for team in team_specs]}", flush=True)
+        print(f"Query: {query}", flush=True)
+        total_index_bin_cells = sum(int(np.prod(shape)) for shape in team_specs.values())
+        selected_bin_cells_by_team = {
+            team: int(np.prod([len(range(*slc.indices(dim))) for slc, dim in zip(query_slices[team], team_specs[team])]))
+            for team in team_specs
+        }
+        total_selected_bin_cells = sum(selected_bin_cells_by_team.values())
+        selected_fraction = (
+            total_selected_bin_cells / total_index_bin_cells
+            if total_index_bin_cells else 0.0
+        )
+
+        print(f"Output root: {destination_folder}", flush=True)
+        print(f"T_rel values: {t_rel_values}", flush=True)
+        print(f"Distribution profile: {distribution_profile} (strength={distribution_strength:g})", flush=True)
+        print(
+            "Bin-Geometrie: "
+            f"{list(team_specs.values())[0][0]} Bins/Dimension, "
+            f"{len(range(*next(iter(query_slices.values()))[0].indices(list(team_specs.values())[0][0])))} Query-Bins/Dimension, "
+            f"{next(iter(selected_bin_cells_by_team.values())):,} getroffene Zellen pro Team, "
+            f"{total_selected_bin_cells:,} getroffene Zellen gesamt "
+            f"von {total_index_bin_cells:,} Index-Zellen "
+            f"({selected_fraction:.2%})",
+            flush=True,
+        )
 
         team_dists = build_team_distributions(
             team_specs=team_specs,
@@ -170,11 +205,13 @@ def main():
             print(
                 "  WARNING: sehr wenige erwartete Query-Treffer im kleinsten Team "
                 f"({expected_min_hits:.1f} < {min_query_hits_warning}). "
-                "Laufzeiten koennen stark varianzgepraegt sein."
+                "Laufzeiten koennen stark varianzgepraegt sein.",
+                flush=True,
             )
         print(
             f"  smallest_team_query_hits≈{expected_min_hits:.1f}, "
-            f"intersection_hits_at_max_Trel≈{expected_max_intersection:.1f}"
+            f"intersection_hits_at_max_Trel≈{expected_max_intersection:.1f}",
+            flush=True,
         )
         tb.generate_indices(
             N=n,
