@@ -63,6 +63,14 @@ VARIANT_COLORS = {
     "dynamic_selective_expansion": "#2563eb",
 }
 
+DEFAULT_BINS_PER_DIMENSION = 20
+DEFAULT_SELECTED_BINS_PER_DIMENSION = 8
+DEFAULT_DIMENSION = 5
+BIN_NOTE = (
+    "5D-Teams, N=1M, 20 Bins/Dimension, "
+    "8 Query-Bins/Dimension, 32 Worker"
+)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -98,6 +106,45 @@ def parse_args():
         help="Nur in output-dir schreiben, nichts nach thesis/ kopieren.",
     )
     return parser.parse_args()
+
+
+def enrich_bin_geometry(summary: pd.DataFrame) -> pd.DataFrame:
+    """Fill bin/cell geometry for older runs that predate explicit bin columns."""
+    summary = summary.copy()
+    team_count = summary["team_count"].astype(int)
+    dimension = summary.get("dimension", pd.Series(DEFAULT_DIMENSION, index=summary.index)).fillna(DEFAULT_DIMENSION).astype(int)
+    bins_per_dimension = summary.get(
+        "bins_per_dimension",
+        pd.Series(DEFAULT_BINS_PER_DIMENSION, index=summary.index),
+    ).fillna(DEFAULT_BINS_PER_DIMENSION).astype(int)
+    selected_bins_per_dimension = summary.get(
+        "selected_bins_per_dimension",
+        pd.Series(DEFAULT_SELECTED_BINS_PER_DIMENSION, index=summary.index),
+    ).fillna(DEFAULT_SELECTED_BINS_PER_DIMENSION).astype(int)
+
+    index_cells_per_team = bins_per_dimension ** dimension
+    selected_cells_per_team = selected_bins_per_dimension ** dimension
+    total_index_cells = team_count * index_cells_per_team
+    total_selected_cells = team_count * selected_cells_per_team
+    total_selected_attribute_bins = team_count * dimension * selected_bins_per_dimension
+
+    values = {
+        "bins_per_dimension": bins_per_dimension,
+        "selected_bins_per_dimension": selected_bins_per_dimension,
+        "index_bin_cells_per_team": index_cells_per_team,
+        "selected_bin_cells_per_team": selected_cells_per_team,
+        "total_index_bin_cells": total_index_cells,
+        "total_selected_bin_cells_nominal": total_selected_cells,
+        "selected_bin_cell_fraction": total_selected_cells / total_index_cells,
+        "total_selected_bin_cells_mean": total_selected_cells,
+        "total_selected_attribute_bins_mean": total_selected_attribute_bins,
+    }
+    for column, value in values.items():
+        if column not in summary.columns:
+            summary[column] = value
+        else:
+            summary[column] = summary[column].fillna(value)
+    return summary
 
 
 def load_latest_summaries(experiment_root: Path, profile_token: str = "uniform") -> pd.DataFrame:
@@ -139,7 +186,7 @@ def load_latest_summaries(experiment_root: Path, profile_token: str = "uniform")
     latest = all_rows.merge(latest_runs, on=["scenario_id", "run_dir"], how="inner")
     latest["variant"] = pd.Categorical(latest["variant"], categories=VARIANT_ORDER, ordered=True)
     latest = latest.sort_values(["team_count", "t_rel", "variant"]).reset_index(drop=True)
-    return latest
+    return enrich_bin_geometry(latest)
 
 
 def latex_escape(value: object) -> str:
@@ -245,9 +292,10 @@ def plot_runtime_lines(summary: pd.DataFrame, output_path: Path):
 
     fig.suptitle("5D-Teamanzahl-Block: Laufzeit nach Teamanzahl und Strategie", y=0.985)
     fig.supylabel("Mittlere Laufzeit [ms]")
+    fig.text(0.5, 0.012, BIN_NOTE, ha="center", fontsize=8)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.945), ncol=3)
-    fig.tight_layout(rect=[0, 0.04, 1, 0.88])
+    fig.tight_layout(rect=[0, 0.055, 1, 0.88])
     fig.savefig(output_path, bbox_inches="tight")
     plt.close(fig)
 
@@ -275,7 +323,8 @@ def plot_ufp_speedup_heatmap(summary: pd.DataFrame, output_path: Path):
         for x in range(matrix.shape[1]):
             ax.text(x, y, f"{matrix.iloc[y, x]:.2f}x", ha="center", va="center", fontsize=10)
     fig.colorbar(image, ax=ax, label="Speedup")
-    fig.tight_layout()
+    fig.text(0.5, 0.01, BIN_NOTE, ha="center", fontsize=8)
+    fig.tight_layout(rect=[0, 0.04, 1, 1])
     fig.savefig(output_path, bbox_inches="tight")
     plt.close(fig)
 
@@ -365,7 +414,7 @@ def plot_profile_teamcount_winners(
     fig.text(
         0.02,
         0.01,
-        "Alle Szenarien: 5D-Teams, N=1M, 20 Bins/Dimension, 8 Query-Bins/Dimension, 32 Worker.",
+        f"Alle Szenarien: {BIN_NOTE}.",
         fontsize=8,
     )
     fig.tight_layout(rect=[0, 0.08, 0.82, 1])
