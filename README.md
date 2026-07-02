@@ -16,7 +16,7 @@ To recreate figures, follow the steps below to install required python packages 
   
     ./create_figures.py
 
-The script then renders the figures using our previous measurements stored in `./data`.
+The script then renders legacy paper figures using previous measurements stored in `./data`. These parquet measurement files are generated data and are intentionally not tracked in this repository. The final bachelor-thesis experiments use the scripts in `study/` instead.
 
 ## Prototype Code
 

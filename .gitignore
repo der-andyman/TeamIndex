@@ -44,4 +44,13 @@ thesis_cleaned/
 
 # Lokale team_bench-Experimentkonfigurationen
 study/experiments/*
+!study/experiments/README.md
 !study/experiments/team_bench_bins20_hit8_dims234_n50k.json
+!study/experiments/team_bench_bins20_hit8_5d_teams2345_n1m.json
+thesis_reviewed/
+thesis_final_stages/
+# Lokal erzeugte/arbeitsbezogene Dateien, nicht fuer GitHub
+SESSION_NOTES.md
+data/*.parquet
+.vscode/
+study/TEAM_BENCH_SCOPE_NOTES.md

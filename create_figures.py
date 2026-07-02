@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""Legacy figure-generation script for the original paper figures.
+
+This script expects precomputed parquet measurement files under ``./data``.
+Those data files are intentionally not tracked in this repository and are not
+part of the final bachelor-thesis ``study/`` workflow.
+"""
 
 from pathlib import Path
 

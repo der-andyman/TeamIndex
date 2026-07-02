@@ -1,0 +1,46 @@
+{
+  "name": "team_bench_bins20_hit8_5d_teams2345_n1m",
+  "description": "Fokussierter groesserer team_bench-Block fuer die finale Nische: 5D-Teams, 2 bis 5 beteiligte Teams, T_rel als Hauptachse und N=1_000_000.",
+  "defaults": {
+    "n": 1000000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "attribute_prefix": "A",
+    "t_rel_values": [
+      0.1,
+      0.35,
+      0.6,
+      0.85
+    ],
+    "team_counts": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "dimensions": [
+      5
+    ],
+    "distribution_profiles": [
+      "uniform",
+      "mixed_team_imbalance",
+      "cell_skew"
+    ],
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 1000,
+    "worker_count": 32,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ]
+  },
+  "safety": {
+    "max_ise_count": 10000
+  }
+}
