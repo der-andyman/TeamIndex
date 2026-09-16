@@ -1,0 +1,43 @@
+{
+  "name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+  "description": "Kleiner Pilot fuer nicht-uniforme team_bench-Daten: 2 Teams, 3D, 20 Bins, 8 Query-Bins und drei Verteilungsprofile.",
+  "output_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k",
+  "defaults": {
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "attribute_prefix": "A",
+    "t_rel_values": [
+      0.1,
+      0.6,
+      0.85
+    ],
+    "team_counts": [
+      2
+    ],
+    "dimensions": [
+      3
+    ],
+    "distribution_profiles": [
+      "uniform",
+      "mixed_team_imbalance",
+      "cell_skew"
+    ],
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ]
+  },
+  "safety": {
+    "max_ise_count": 10000
+  }
+}

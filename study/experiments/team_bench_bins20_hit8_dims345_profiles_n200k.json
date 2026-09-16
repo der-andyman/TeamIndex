@@ -1,0 +1,45 @@
+{
+  "name": "team_bench_bins20_hit8_dims345_profiles_n200k",
+  "description": "Pilotblock fuer nicht-uniforme team_bench-Daten mit 20 Bins pro Dimension, 8 selektierten Bins pro Dimension, 3D-5D Teams und kontrollierten Verteilungsprofilen.",
+  "defaults": {
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "attribute_prefix": "A",
+    "t_rel_values": [
+      0.1,
+      0.6,
+      0.85
+    ],
+    "team_counts": [
+      2,
+      3
+    ],
+    "dimensions": [
+      3,
+      4,
+      5
+    ],
+    "distribution_profiles": [
+      "uniform",
+      "mixed_team_imbalance",
+      "cell_skew"
+    ],
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "worker_count": 16,
+    "repetitions": 3,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ]
+  },
+  "safety": {
+    "max_ise_count": 10000
+  }
+}

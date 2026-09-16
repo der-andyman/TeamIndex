@@ -1,0 +1,39 @@
+{
+  "name": "team_bench_bins30_hit12_5d3t_uniform_n50k_robustness",
+  "description": "Kleiner Bin-/Blatt-Robustheitscheck: 5D, 3 Teams, uniform, 30/12, N=50k.",
+  "defaults": {
+    "n": 50000,
+    "value_domain_max": 100,
+    "attribute_prefix": "A",
+    "t_rel_values": [
+      0.35,
+      0.85
+    ],
+    "team_counts": [
+      3
+    ],
+    "dimensions": [
+      5
+    ],
+    "distribution_profiles": [
+      "uniform"
+    ],
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "worker_count": 16,
+    "repetitions": 3,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "bins_per_dimension": 30,
+    "selected_bins_per_dimension": 12
+  },
+  "safety": {
+    "max_ise_count": 10000
+  }
+}

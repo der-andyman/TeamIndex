@@ -1,0 +1,1928 @@
+[
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t010_uniform",
+    "family_name": "teams2_dim3_uniform",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.1,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "uniform",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.10: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_uniform/selectivity_Trel01_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_uniform/selectivity_Trel01_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t060_uniform",
+    "family_name": "teams2_dim3_uniform",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.6,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "uniform",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.60: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_uniform/selectivity_Trel06_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_uniform/selectivity_Trel06_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t085_uniform",
+    "family_name": "teams2_dim3_uniform",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.85,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "uniform",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.85: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_uniform/selectivity_Trel085_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_uniform/selectivity_Trel085_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t010_mixed_team_imbalance",
+    "family_name": "teams2_dim3_mixed_team_imbalance",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.1,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "mixed_team_imbalance",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.10, Profil=mixed_team_imbalance: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_mixed_team_imbalance/selectivity_Trel01_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_mixed_team_imbalance/selectivity_Trel01_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t060_mixed_team_imbalance",
+    "family_name": "teams2_dim3_mixed_team_imbalance",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.6,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "mixed_team_imbalance",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.60, Profil=mixed_team_imbalance: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_mixed_team_imbalance/selectivity_Trel06_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_mixed_team_imbalance/selectivity_Trel06_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t085_mixed_team_imbalance",
+    "family_name": "teams2_dim3_mixed_team_imbalance",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.85,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "mixed_team_imbalance",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.85, Profil=mixed_team_imbalance: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_mixed_team_imbalance/selectivity_Trel085_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_mixed_team_imbalance/selectivity_Trel085_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t010_cell_skew",
+    "family_name": "teams2_dim3_cell_skew",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.1,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "cell_skew",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.10, Profil=cell_skew: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_cell_skew/selectivity_Trel01_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_cell_skew/selectivity_Trel01_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t060_cell_skew",
+    "family_name": "teams2_dim3_cell_skew",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.6,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "cell_skew",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.60, Profil=cell_skew: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_cell_skew/selectivity_Trel06_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_cell_skew/selectivity_Trel06_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  },
+  {
+    "experiment_name": "team_bench_bins20_hit8_2t3d_profiles_n200k",
+    "scenario_id": "tb_2t_3d_t085_cell_skew",
+    "family_name": "teams2_dim3_cell_skew",
+    "team_count": 2,
+    "dimension": 3,
+    "t_rel": 0.85,
+    "n": 200000,
+    "bins_per_dimension": 20,
+    "selected_bins_per_dimension": 8,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 5,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "cell_skew",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40",
+    "query_note": "2 Teams, 3D, T_rel=0.85, Profil=cell_skew: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D",
+        "E",
+        "F"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "B": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "C": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "D": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "E": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ],
+      "F": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        35.0,
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        60.0,
+        65.0,
+        70.0,
+        75.0,
+        80.0,
+        85.0,
+        90.0,
+        95.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ],
+      "D-E-F": [
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ],
+        [
+          0,
+          8,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_cell_skew/selectivity_Trel085_N200000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins20_hit8_dims345_profiles_n200k/teams2_dim3_cell_skew/selectivity_Trel085_N200000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins20_hit8_2t3d_profiles_n200k"
+  }
+]

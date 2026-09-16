@@ -1,0 +1,642 @@
+[
+  {
+    "experiment_name": "team_bench_bins10_hit4_5d3t_uniform_n50k_robustness",
+    "scenario_id": "tb_3t_5d_t035",
+    "family_name": "teams3_dim5",
+    "team_count": 3,
+    "dimension": 5,
+    "t_rel": 0.35,
+    "n": 50000,
+    "bins_per_dimension": 10,
+    "selected_bins_per_dimension": 4,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 3,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "uniform",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40 and G < 40 and H < 40 and I < 40 and J < 40 and K < 40 and L < 40 and M < 40 and N < 40 and O < 40",
+    "query_note": "3 Teams, 5D, T_rel=0.35: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      [
+        "F",
+        "G",
+        "H",
+        "I",
+        "J"
+      ],
+      [
+        "K",
+        "L",
+        "M",
+        "N",
+        "O"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "B": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "C": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "D": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "E": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "F": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "G": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "H": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "I": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "J": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "K": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "L": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "M": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "N": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "O": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C-D-E": [
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ]
+      ],
+      "F-G-H-I-J": [
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ]
+      ],
+      "K-L-M-N-O": [
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins10_hit4_5d3t_uniform_n50k_robustness/teams3_dim5/selectivity_Trel035_N50000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins10_hit4_5d3t_uniform_n50k_robustness/teams3_dim5/selectivity_Trel035_N50000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins10_hit4_5d3t_uniform_n50k_robustness"
+  },
+  {
+    "experiment_name": "team_bench_bins10_hit4_5d3t_uniform_n50k_robustness",
+    "scenario_id": "tb_3t_5d_t085",
+    "family_name": "teams3_dim5",
+    "team_count": 3,
+    "dimension": 5,
+    "t_rel": 0.85,
+    "n": 50000,
+    "bins_per_dimension": 10,
+    "selected_bins_per_dimension": 4,
+    "value_domain_max": 100,
+    "worker_count": 16,
+    "repetitions": 3,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ],
+    "distribution_profile": "uniform",
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "query": "A < 40 and B < 40 and C < 40 and D < 40 and E < 40 and F < 40 and G < 40 and H < 40 and I < 40 and J < 40 and K < 40 and L < 40 and M < 40 and N < 40 and O < 40",
+    "query_note": "3 Teams, 5D, T_rel=0.85: kontrollierte synthetische Query mit disjunkten Teams",
+    "attributes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O"
+    ],
+    "teams": [
+      [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      [
+        "F",
+        "G",
+        "H",
+        "I",
+        "J"
+      ],
+      [
+        "K",
+        "L",
+        "M",
+        "N",
+        "O"
+      ]
+    ],
+    "quantiles": {
+      "A": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "B": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "C": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "D": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "E": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "F": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "G": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "H": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "I": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "J": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "K": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "L": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "M": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "N": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ],
+      "O": [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0
+      ]
+    },
+    "query_slices": {
+      "A-B-C-D-E": [
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ]
+      ],
+      "F-G-H-I-J": [
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ]
+      ],
+      "K-L-M-N-O": [
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ],
+        [
+          0,
+          4,
+          null
+        ]
+      ]
+    },
+    "data_root": "/media/data/duman/teamindex/team_bench/team_bench_bins10_hit4_5d3t_uniform_n50k_robustness/teams3_dim5/selectivity_Trel085_N50000",
+    "index_config_path": "/media/data/duman/teamindex/team_bench/team_bench_bins10_hit4_5d3t_uniform_n50k_robustness/teams3_dim5/selectivity_Trel085_N50000/index.json",
+    "benchmark_output_root": "/home/duman/TeamIndex/study/team_bench_results/team_bench_bins10_hit4_5d3t_uniform_n50k_robustness"
+  }
+]

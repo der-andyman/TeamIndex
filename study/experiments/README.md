@@ -1,13 +1,11 @@
 # Experiment-Konfigurationen
 
-Die meisten lokalen Experiment-Konfigurationen werden nicht versioniert, weil sie
-während der Arbeit schnell anwachsen und teilweise nur Zwischenstände darstellen.
+Im Repository befinden sich die Konfigurationen der 27 Experimente, die für die
+Bachelorarbeit durchgeführt und ausgewertet wurden.
 
-Im Repository bleiben bewusst nur wenige Beispielkonfigurationen, damit das
-Format nachvollziehbar ist:
+Die JSON-Dateien enthalten die jeweiligen Ausgangskonfigurationen der Experimente
+und dokumentieren damit die verwendeten Parameter und untersuchten
+Konstellationen.
 
-- `team_bench_bins20_hit8_dims234_n50k.json`: kleiner systematischer Beispielblock.
-- `team_bench_bins20_hit8_5d_teams2345_n1m.json`: fokussierter 5D-Block aus der finalen Experimentnische.
-
-Erweiterte `*-expanded.json`-Dateien werden aus den Konfigurationen generiert und
-sollten nicht manuell gepflegt werden.
+Erweiterte *-expanded.json-Dateien werden aus diesen Konfigurationen generiert
+und sollten nicht manuell gepflegt werden.

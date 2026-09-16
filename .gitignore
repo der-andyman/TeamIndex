@@ -43,7 +43,7 @@ thesis_cleaned/
 /experiments/
 
 # Lokale team_bench-Experimentkonfigurationen
-study/experiments/*
+!study/experiments/*
 !study/experiments/README.md
 !study/experiments/team_bench_bins20_hit8_dims234_n50k.json
 !study/experiments/team_bench_bins20_hit8_5d_teams2345_n1m.json

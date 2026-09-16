@@ -1,0 +1,46 @@
+{
+  "name": "team_bench_bins10_hit4_dims356_profiles_n200k",
+  "description": "Pilotblock fuer nicht-uniforme team_bench-Daten. Verglichen werden uniforme Daten, unbalancierte Teams und innerhalb der Query stark ungleich verteilte Zellen fuer 3D, 5D und 6D.",
+  "defaults": {
+    "n": 200000,
+    "bins_per_dimension": 10,
+    "selected_bins_per_dimension": 4,
+    "value_domain_max": 100,
+    "attribute_prefix": "A",
+    "t_rel_values": [
+      0.1,
+      0.6,
+      0.85
+    ],
+    "team_counts": [
+      2,
+      3,
+      4
+    ],
+    "dimensions": [
+      3,
+      5,
+      6
+    ],
+    "distribution_profiles": [
+      "uniform",
+      "mixed_team_imbalance",
+      "cell_skew"
+    ],
+    "distribution_strength": 10.0,
+    "min_query_hits_warning": 500,
+    "worker_count": 16,
+    "repetitions": 3,
+    "baseline_variant": "baseline_union_first",
+    "strategies": [
+      "baseline_union_first",
+      "union_first_parallel",
+      "current_handcrafted",
+      "bounded_selective_expansion",
+      "dynamic_selective_expansion"
+    ]
+  },
+  "safety": {
+    "max_ise_count": 10000
+  }
+}
