@@ -1,6 +1,6 @@
 # Experiment-Konfigurationen
 
-Im Repository befinden sich nun die Konfigurationen Experimente, die für die
+Im Repository befinden sich nun die Konfigurationen der Experimente, die für die
 Bachelorarbeit durchgeführt und ausgewertet wurden.
 
 Die JSON-Dateien enthalten die jeweiligen Ausgangskonfigurationen der Experimente
